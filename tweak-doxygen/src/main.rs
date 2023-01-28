@@ -29,30 +29,34 @@ fn main() {
     println!("Done!");
 }
 
-fn get_lines(path: &str) -> HashMap<String, Vec<String>> {
-    let mut map: HashMap<String, Vec<String>> = HashMap::new();
+#[derive(Default)]
+struct PackageInfo {
+    classes: Vec<String>,
+    usings: Vec<String>,
+}
+
+fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
+    let mut map: HashMap<String, PackageInfo> = HashMap::new();
+
+    println!("Starting collecting ...");
 
     for file in WalkDir::new(path)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| !e.file_type().is_dir())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("tweak")
+        })
     {
-        // filter to tweak files
-        if !file
-            .path()
-            .extension()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .contains("tweak")
-        {
-            //println!("ERROR: Not a tweak file {}", file.path().display());
-            continue;
-        }
-
         //println!("Processing {} ...", file.path().display());
 
-        let mut ns = String::from("");
+        let mut namespace = String::from("");
+        let mut usings: Vec<String> = vec![];
         let mut inner_lines = vec![];
 
         // read lines in file
@@ -62,7 +66,15 @@ fn get_lines(path: &str) -> HashMap<String, Vec<String>> {
             let line = line.unwrap_or_else(|_| panic!("ERROR at {f}"));
 
             if line.starts_with("package ") {
-                ns = line.clone()[8..].trim_end().to_string();
+                namespace = line.clone()["package ".len()..].trim_end().to_string();
+            }
+
+            if let Some(stripped) = line.strip_prefix("using ") {
+                usings = stripped
+                    //.trim_end()
+                    .split(',')
+                    .map(|s| s.trim().to_owned())
+                    .collect::<Vec<_>>();
             }
 
             if !line.is_empty()
@@ -82,60 +94,71 @@ fn get_lines(path: &str) -> HashMap<String, Vec<String>> {
         }
 
         // error if no namespace
-        if ns.is_empty() {
+        if namespace.is_empty() {
             println!("ERROR: no namespace in file {}", file.path().display());
             continue;
         }
 
         // add to map
-        if !map.contains_key(&ns) {
-            map.insert(ns.to_string(), vec![]);
+        if !map.contains_key(&namespace) {
+            map.insert(namespace.to_string(), PackageInfo::default());
         }
-
-        for element in inner_lines {
-            map.get_mut(&ns).unwrap().push(element);
+        for c in inner_lines {
+            if !map[&namespace].classes.contains(&c) {
+                map.get_mut(&namespace).unwrap().classes.push(c);
+            }
+        }
+        for u in usings {
+            if !map[&namespace].usings.contains(&u.to_string()) {
+                map.get_mut(&namespace).unwrap().usings.push(u.to_string());
+            }
         }
     }
 
     map
 }
 
-fn convert_to_cs(map: &mut HashMap<String, Vec<String>>, out_path: &str) {
+fn convert_to_cs(map: &mut HashMap<String, PackageInfo>, out_path: &str) {
     // check lowercase duplicates
     let mut check = vec![];
 
-    //for key in map.keys().sorted() {}
-    for (ns, classes) in map {
+    println!("Starting printing ...");
+
+    for (key, package) in map {
         let mut outpath = Path::new(&out_path);
-        if check.contains(&ns.to_lowercase()) {
-            println!("DUPLICATE {ns} ...");
+        if check.contains(&key.to_lowercase()) {
+            println!("DUPLICATE {key} ...");
 
             outpath = Path::new("Z:\\_out\\in\\duplicates");
             fs::create_dir_all(outpath).expect("Error creating folder");
         }
 
-        //println!("Processing {ns} ...");
+        //println!("Processing {key} ...");
 
-        let file = File::create(outpath.join(format!("{ns}.cs")))
-            .unwrap_or_else(|_| panic!("ERROR: Failed to create file {ns}"));
+        let file = File::create(outpath.join(format!("{key}.cs")))
+            .unwrap_or_else(|_| panic!("ERROR: Failed to create file {key}"));
         let mut writer = BufWriter::new(file);
 
-        for line in classes.iter_mut() {
-            line.insert_str(0, "public class ");
-            line.push_str(" {}");
-        }
-
         // write to file
-        let namespace = format!("namespace {ns};");
-        writer.write_all(namespace.as_bytes()).unwrap();
-        writer.write_all(b"\n").unwrap();
-        writer.write_all(b"\n").unwrap();
-
-        for line in classes.iter() {
-            writer.write_all(line.as_bytes()).unwrap();
-            writer.write_all(b"\n").unwrap();
+        // usings //using System.Collections.Generic;
+        for u in package.usings.iter() {
+            writer
+                .write_all(format!("using {u};\n").as_bytes())
+                .unwrap();
         }
 
-        check.push(ns.to_lowercase());
+        // namespace
+        writer
+            .write_all(format!("namespace {key};\n\n").as_bytes())
+            .unwrap();
+
+        // classes
+        for c in package.classes.iter() {
+            writer
+                .write_all(format!("public class {c} {{ }}\n").as_bytes())
+                .unwrap();
+        }
+
+        check.push(key.to_lowercase());
     }
 }
