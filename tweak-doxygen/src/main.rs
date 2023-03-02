@@ -5,25 +5,24 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::path::PathBuf;
 use walkdir::WalkDir;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.is_empty() {
-        println!("please provide an input path");
-    }
+    let mut in_path = env::current_dir().expect("No working directory");
 
-    let in_path = &args[1];
-    let mut out_path = "";
     if args.len() > 1 {
-        out_path = &args[2];
-    }
-    if out_path.is_empty() {
-        out_path = "html";
+        in_path = (&args[1]).into();
     }
 
-    let mut map = get_lines(in_path.as_str());
+    let mut out_path = PathBuf::from("./_tweak_cs");
+    if args.len() > 2 {
+        out_path = (&args[2]).into();
+    }
+
+    let mut map = get_lines(in_path.as_os_str().to_str().expect("no usable input path"));
     convert_to_cs(&mut map, out_path);
 
     println!("Done!");
@@ -44,6 +43,7 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| !e.file_type().is_dir())
+        .filter(|e| e.path().extension().is_some())
         .filter(|e| {
             e.path()
                 .extension()
@@ -118,19 +118,17 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
     map
 }
 
-fn convert_to_cs(map: &mut HashMap<String, PackageInfo>, out_path: &str) {
+fn convert_to_cs(map: &mut HashMap<String, PackageInfo>, out_path: PathBuf) {
     // check lowercase duplicates
     let mut check = vec![];
 
     println!("Starting printing ...");
+    let outpath = Path::new(&out_path);
+    fs::create_dir_all(outpath).expect("Error creating folder");
 
     for (key, package) in map {
-        let mut outpath = Path::new(&out_path);
         if check.contains(&key.to_lowercase()) {
-            println!("DUPLICATE {key} ...");
-
-            outpath = Path::new("Z:\\_out\\in\\duplicates");
-            fs::create_dir_all(outpath).expect("Error creating folder");
+            panic!("DUPLICATE {key} ...");
         }
 
         //println!("Processing {key} ...");
