@@ -60,15 +60,71 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
         let mut inner_lines = vec![];
 
         // read lines in file
+        let mut skipping = false;
         let reader = BufReader::new(fs::File::open(file.path()).unwrap());
-        for line in reader.lines() {
+        for (linen, rawline) in reader.lines().enumerate() {
             let f = file.path().display().to_string();
-            let line = line.unwrap_or_else(|_| panic!("ERROR at {f}"));
+            let mut line = rawline.unwrap_or_else(|_| panic!("ERROR at {f}:{linen}"));
 
+            // end block comments
+            if skipping {
+                if line.starts_with("*/") {
+                    skipping = false;
+                    // still continue with rest of line
+                    line = line[2..].to_string();
+                } else if line.ends_with("*/") {
+                    skipping = false;
+                    // can be skipped
+                    continue;
+                } else if line.contains("/*") && line.contains("*/") {
+                    // do nothing
+                    println!("???")
+                } else if line.contains("*/") {
+                    skipping = false;
+                    // still continue with rest of line
+                    let idx = line.find("*/").unwrap() + 2;
+                    line = line[idx..].to_string();
+                }
+
+                // nothing found to end skipping
+                if skipping {
+                    continue;
+                }
+            }
+
+            // start block comments
+            if !skipping {
+                if line.starts_with("/*") && !line.contains("*/") {
+                    skipping = true;
+                    // can be skipped and continue skipping
+                    continue;
+                } else if line.starts_with("/*") && line.contains("*/") {
+                    // block comment in one line
+                    // do nothing but ignore the comment
+                    // still continue with rest of line
+                    let idx = line.find("*/").unwrap() + 2;
+                    line = line[idx..].to_string();
+                } else if line.contains("/*") && !line.contains("*/") {
+                    skipping = true;
+
+                    // println!(
+                    //     "WARNING: blockcomment across multiple lines at {} in {}",
+                    //     linen,
+                    //     file.path().display()
+                    // );
+
+                    // still evaluate start of the line
+                    let idx = line.find("/*").unwrap();
+                    line = line[..idx].to_string();
+                }
+            }
+
+            // namespaces
             if line.starts_with("package ") {
                 namespace = line.clone()["package ".len()..].trim_end().to_string();
             }
 
+            // usings
             if let Some(stripped) = line.strip_prefix("using ") {
                 usings = stripped
                     //.trim_end()
@@ -77,20 +133,24 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
                     .collect::<Vec<_>>();
             }
 
-            if !line.is_empty()
-                && !line.starts_with('\t')
-                && !line.starts_with(' ')
-                && !line.starts_with('{')
-                && !line.starts_with('}')
-                && !line.starts_with('[')
-                && !line.starts_with(']')
-                && !line.starts_with("package ")
-                && !line.starts_with("using ")
-                && !line.starts_with("//")
-                && !line.contains('=')
+            // skip specific lines
+            if line.is_empty()
+                || line.starts_with('\t')
+                || line.starts_with(' ')
+                || line.starts_with('{')
+                || line.starts_with('}')
+                || line.starts_with('[')
+                || line.starts_with(']')
+                || line.starts_with("package ")
+                || line.starts_with("using ")
+                || line.starts_with("//")
+                || line.contains('=')
             {
-                inner_lines.push(line);
+                continue;
             }
+
+            // classes
+            inner_lines.push(line);
         }
 
         // error if no namespace
@@ -100,14 +160,27 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
         }
 
         // add to map
+        // add namespace
         if !map.contains_key(&namespace) {
             map.insert(namespace.to_string(), PackageInfo::default());
         }
+        // add class to namespace
         for c in inner_lines {
-            if !map[&namespace].classes.contains(&c) {
-                map.get_mut(&namespace).unwrap().classes.push(c);
+            // need to sanitze class names e.g. OverrideAuthorizationClassHack : DeviceQuickHack // ---> obsolete
+            // only take stuff before the first comment
+            let mut class = c.clone();
+            if c.contains("//") {
+                // clean comments
+                let s: String = c.split("//").take(1).collect();
+                //println!("INFO: sanitize [{}] in {}", c, file.path().display());
+                class = s.trim_end().to_string();
+            }
+
+            if !map[&namespace].classes.contains(&class) {
+                map.get_mut(&namespace).unwrap().classes.push(class);
             }
         }
+        // add usings to namespace
         for u in usings {
             if !map[&namespace].usings.contains(&u.to_string()) {
                 map.get_mut(&namespace).unwrap().usings.push(u.to_string());
