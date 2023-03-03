@@ -150,7 +150,25 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
             }
 
             // classes
-            inner_lines.push(line);
+
+            // Sanitize
+            let mut rawclass = line.clone();
+
+            // clean comments e.g. OverrideAuthorizationClassHack : DeviceQuickHack // ---> obsolete
+            if rawclass.contains("//") {
+                let s: String = rawclass.split("//").take(1).collect();
+                //println!("INFO: sanitize [{}] in {}", c, file.path().display());
+                rawclass = s.trim_end().to_string();
+            }
+
+            // clean oneliners e.g. TauntLMGOpen03 : TauntLMGOpen01 {}
+            if rawclass.contains("{}") {
+                let s: String = rawclass.split("{}").take(1).collect();
+                //println!("INFO: sanitize [{}] in {}", c, file.path().display());
+                rawclass = s.trim_end().to_string();
+            }
+
+            inner_lines.push(rawclass);
         }
 
         // error if no namespace
@@ -166,18 +184,8 @@ fn get_lines(path: &str) -> HashMap<String, PackageInfo> {
         }
         // add class to namespace
         for c in inner_lines {
-            // need to sanitze class names e.g. OverrideAuthorizationClassHack : DeviceQuickHack // ---> obsolete
-            // only take stuff before the first comment
-            let mut class = c.clone();
-            if c.contains("//") {
-                // clean comments
-                let s: String = c.split("//").take(1).collect();
-                //println!("INFO: sanitize [{}] in {}", c, file.path().display());
-                class = s.trim_end().to_string();
-            }
-
-            if !map[&namespace].classes.contains(&class) {
-                map.get_mut(&namespace).unwrap().classes.push(class);
+            if !map[&namespace].classes.contains(&c) {
+                map.get_mut(&namespace).unwrap().classes.push(c);
             }
         }
         // add usings to namespace
