@@ -62,44 +62,42 @@ pub fn parse_rules(rules_path: &str) -> Result<Rules, &'static str> {
         let mut current_order: Vec<String> = vec![];
 
         // Consumes the iterator, returns an (Optional) String
-        for line_or_error in lines {
-            if let Ok(line) = line_or_error {
-                // parse each line
-                if line.starts_with(';') {
-                    continue;
-                }
+        for line in lines.flatten() {
+            // parse each line
+            if line.starts_with(';') {
+                continue;
+            }
 
-                // order parsing
-                if parsing && line.is_empty() {
-                    parsing = false;
-                    orders.push(current_order.to_owned());
-                    current_order.clear();
-                    continue;
-                }
+            // order parsing
+            if parsing && line.is_empty() {
+                parsing = false;
+                orders.push(current_order.to_owned());
+                current_order.clear();
+                continue;
+            }
 
-                if !parsing && line == "[Order]" {
-                    parsing = true;
-                    // TODO set type
-                    continue;
-                }
+            if !parsing && line == "[Order]" {
+                parsing = true;
+                // TODO set type
+                continue;
+            }
 
-                if parsing {
-                    current_order.push(line);
-                }
+            if parsing {
+                current_order.push(line);
             }
         }
         orders.push(current_order.to_owned());
 
         // process orders
         for o in orders {
-            if o.len() < 2 {
-                continue;
-            } else if o.len() == 2 {
-                order.push((o[0].to_owned(), o[1].to_owned()));
-            } else {
-                // add all pairs
-                for i in 0..o.len() - 1 {
-                    order.push((o[i].to_owned(), o[i + 1].to_owned()));
+            match o.len().cmp(&2) {
+                std::cmp::Ordering::Less => continue,
+                std::cmp::Ordering::Equal => order.push((o[0].to_owned(), o[1].to_owned())),
+                std::cmp::Ordering::Greater => {
+                    // add all pairs
+                    for i in 0..o.len() - 1 {
+                        order.push((o[i].to_owned(), o[i + 1].to_owned()));
+                    }
                 }
             }
         }
@@ -117,10 +115,8 @@ pub fn parse_rules(rules_path: &str) -> Result<Rules, &'static str> {
 pub fn read_file_as_list(modlist_path: &str) -> Vec<String> {
     let mut result: Vec<String> = vec![];
     if let Ok(lines) = read_lines(modlist_path) {
-        for line in lines {
-            if let Ok(ip) = line {
-                result.push(ip);
-            }
+        for line in lines.flatten() {
+            result.push(line);
         }
     }
     result

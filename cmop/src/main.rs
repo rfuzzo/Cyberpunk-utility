@@ -23,7 +23,7 @@ fn main() {
 
     match parse_rules(&rules_path) {
         Ok(rules) => match topo_sort(mods, &rules) {
-            Ok(result) => println!("{:?}", result),
+            Ok(result) => println!("{result:?}"),
             Err(e) => println!("error sorting: {e:?}"),
         },
         Err(e) => println!("error parsing file: {e:?}"),

@@ -51,18 +51,18 @@ mod tests {
             }
         }
 
-        return true;
+        true
     }
 
     #[test]
     fn test_read_mods() {
         let mods_path = "./tests/modlist.txt";
-        assert_eq!(read_file_as_list(&mods_path), vec!["a", "b", "c", "d", "e"])
+        assert_eq!(read_file_as_list(mods_path), vec!["a", "b", "c", "d", "e"])
     }
 
     #[test]
     fn test_parse_rules() {
         let rules_path = "./tests/rules_base.txt";
-        assert!(parse_rules(&rules_path).is_ok(), "rules parsing failed")
+        assert!(parse_rules(rules_path).is_ok(), "rules parsing failed")
     }
 }
