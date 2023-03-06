@@ -15,17 +15,25 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
-    - run: cd cmop
     
     - name: Check
-      run: cargo check --all-features
+      run: |
+        cd cmop
+        cargo check --all-features
     - name: Format
-      run: cargo fmt --all -- --check   
+      run: |
+        cd cmop
+        cargo fmt --all -- --check   
     - name: Clippy
-      run: cargo clippy -- -D warnings
+      run: |
+        cd cmop
+        cargo clippy -- -D warnings
       
     - name: Build
-      run: cargo build --verbose
+      run: |
+        cd cmop
+        cargo build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: |
+        cd cmop
+        cargo test --verbose
