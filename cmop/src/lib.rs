@@ -38,7 +38,7 @@ pub fn topo_sort(input: &Vec<String>, rules: &Rules) -> Result<Vec<String>, &'st
         result.push(s.into());
     }
 
-    if result.len() != input.len() {
+    if !sort.is_empty() {
         return Err("cycle detected");
     }
 
