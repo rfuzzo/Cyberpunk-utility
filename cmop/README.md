@@ -140,18 +140,30 @@ Advanced Alchemy - LDA patch.esp
 Nemon's_Vivec_Interiorator.esp
 ```
 
+### [NOT]
+
+```txt
+[Note] ; ( Ref: "Readme - Tealpanda's Alchemy Essentials.txt" )
+      ! If you do not have Tribunal, Bloodmoon, and "Tamriel Rebuilt" installed you will NEED to use the folder "Optional - Ingredient Retexture" to use most of these mods.
+[ALL  [ANY  Tealpanda's Alchemy Essentials.esp
+            TAE - essence potions.esp
+            TAE - ingredient trader.esp
+            AE - TR essences and effects.esp]
+      [NOT  [ANY  Tribunal.esm
+                  Bloodmoon.esm
+                  Tamriel_Data.esm]]]
+```
+
 ### Nesting
 
 ```txt
-[Note] ; ( Ref: http://www.mwmythicmods.com/Gluby/Gluby_Magicka_and_Spell_Effect_Mods.htm#MagickaRegenMods )
- ! "[Glassboy's "Adjustable Magicka Regen"] uses its own hard-coded determination of maximum Magicka for purposes of regeneration rate that make it likely to come up with an inaccurate (usually lower) rate when used with mods that change or add birthsigns, races and other factors that grant or modify Magicka multipliers."
-[ALL  [ANY  Adj_Magicka Regen (0.10%).esp
-            Adj_Magicka Regen (0.25%).esp
-            Adj_Magicka Regen (0.50%).esp
-            Adj_Magicka Regen (1.00%).esp]
-      [ANY  AprogasVampire WakimImprovements.20021210.esp
-            Balance - Character.esp
-            Birthsign1.esp
-            Wakim's Game Improvement 9.esp
-            Wakim's Game Improvements with No-glo v9.esp]]
+[Note] ; ( Ref: "Readme - Tealpanda's Alchemy Essentials.txt" )
+      ! If you do not have Tribunal, Bloodmoon, and "Tamriel Rebuilt" installed you will NEED to use the folder "Optional - Ingredient Retexture" to use most of these mods.
+[ALL  [ANY  Tealpanda's Alchemy Essentials.esp
+            TAE - essence potions.esp
+            TAE - ingredient trader.esp
+            AE - TR essences and effects.esp]
+      [NOT  [ANY  Tribunal.esm
+                  Bloodmoon.esm
+                  Tamriel_Data.esm]]]
 ```

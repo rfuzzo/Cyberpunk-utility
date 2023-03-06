@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 topological-sort = "0.2.2"
+clap = { version = "4.1.8",  features = ["derive"] }
