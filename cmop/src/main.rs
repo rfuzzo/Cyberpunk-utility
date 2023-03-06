@@ -86,16 +86,18 @@ fn sort(
     }
 
     match parse_rules(rules_path) {
-        Ok(rules) => match topo_sort(mods, &rules) {
+        Ok(rules) => match topo_sort(&mods, &rules) {
             Ok(result) => {
                 if dry_run {
                     println!("Dry run...");
                     println!("{result:?}");
                 } else {
                     println!("Sorting mods...");
+                    println!("{:?}", &mods);
+                    println!("New:");
                     println!("{result:?}");
 
-                    todo!()
+                    //todo!()
                 }
 
                 ExitCode::SUCCESS
@@ -119,7 +121,7 @@ fn verify(rules_path: &PathBuf) -> ExitCode {
     match parse_rules(rules_path) {
         Ok(rules) => {
             let mods = get_mods_from_rules(&rules);
-            match topo_sort(mods, &rules) {
+            match topo_sort(&mods, &rules) {
                 Ok(_) => {
                     println!("true");
                     ExitCode::SUCCESS

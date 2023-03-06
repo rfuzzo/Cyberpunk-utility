@@ -3,17 +3,9 @@ a
 b
 c
 
-;[Order]
-;a
-;b
-
-;[Order]
-;b
-;c
-
-;[Order]
-;d
-;e
+[Order]
+d
+e
 
 ; comment
 [Order]

@@ -15,10 +15,18 @@ mod tests {
             ],
         };
 
-        let mods = vec!["a", "b", "c", "d", "e"];
+        let mods = vec![
+            "a".to_owned(),
+            "b".into(),
+            "c".into(),
+            "d".into(),
+            "e".into(),
+            "f".into(),
+            "g".into(),
+        ];
 
         assert!(
-            topo_sort(mods, &rules).is_err(),
+            topo_sort(&mods, &rules).is_err(),
             "rules do not contain a cycle"
         )
     }
@@ -31,12 +39,21 @@ mod tests {
                 ("b".into(), "c".into()),
                 ("d".into(), "e".into()),
                 ("e".into(), "c".into()),
+                ("test.archive".into(), "test2.archive".into()),
             ],
         };
 
-        let mods = vec!["a", "b", "c", "d", "e"];
+        let mods = vec![
+            "a".to_owned(),
+            "b".into(),
+            "c".into(),
+            "d".into(),
+            "e".into(),
+            "f".into(),
+            "g".into(),
+        ];
 
-        match topo_sort(mods, &rules) {
+        match topo_sort(&mods, &rules) {
             Ok(result) => assert!(checkresult(result, &rules), "order is wrong"),
             Err(_) => panic!("rules contain a cycle"),
         }
@@ -45,10 +62,16 @@ mod tests {
     fn checkresult(result: Vec<String>, rules: &Rules) -> bool {
         let pairs = &rules.order;
         for (a, b) in pairs {
-            let pos_a = result.iter().position(|x| x == a).unwrap();
-            let pos_b = result.iter().position(|x| x == b).unwrap();
+            let pos_a = result.iter().position(|x| x == a);
+            if pos_a.is_none() {
+                continue;
+            }
+            let pos_b = result.iter().position(|x| x == b);
+            if pos_b.is_none() {
+                continue;
+            }
 
-            if pos_a > pos_b {
+            if pos_a.unwrap() > pos_b.unwrap() {
                 return false;
             }
         }
@@ -75,7 +98,7 @@ mod tests {
 
         let mods = get_mods_from_rules(&rules);
 
-        assert!(topo_sort(mods, &rules).is_ok(), "rules contain a cycle")
+        assert!(topo_sort(&mods, &rules).is_ok(), "rules contain a cycle")
     }
 
     #[test]

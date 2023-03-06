@@ -16,21 +16,20 @@ enum RuleKind {
 }
 
 // sort the strings according to pairs
-pub fn topo_sort<S>(input: Vec<S>, rules: &Rules) -> Result<Vec<String>, &'static str>
-where
-    S: AsRef<str>,
-{
+pub fn topo_sort(input: &Vec<String>, rules: &Rules) -> Result<Vec<String>, &'static str> {
     // Create a new TopologicalSort instance
     let mut sort = TopologicalSort::<&str>::new();
 
     // Add all the strings as items
-    for s in &input {
+    for s in input {
         sort.insert(s.as_ref());
     }
 
     // Add all the pairs as dependencies
     for (a, b) in &rules.order {
-        sort.add_dependency(a.as_ref(), b.as_ref());
+        if input.contains(a) && input.contains(b) {
+            sort.add_dependency(a.as_ref(), b.as_ref());
+        }
     }
 
     // Sort the items and collect them into a vector
