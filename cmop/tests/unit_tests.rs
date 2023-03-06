@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use cl_optimizer::{parse_rules, read_file_as_list, topo_sort, Rules};
+    use cmop::{parse_rules, read_file_as_list, topo_sort, Rules};
 
     #[test]
     fn test_cycle() {

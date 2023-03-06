@@ -1,4 +1,4 @@
-use cl_optimizer::{parse_rules, read_file_as_list, topo_sort};
+use cmop::{parse_rules, read_file_as_list, topo_sort};
 use std::env;
 
 fn main() {

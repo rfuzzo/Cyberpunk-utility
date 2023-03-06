@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "cl_optimizer"
+name = "cmop"
 version = "0.1.0"
 dependencies = [
  "topological-sort",
