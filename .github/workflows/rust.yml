@@ -10,12 +10,13 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  cmop:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
+
+    - run: cd cmop
     
     - name: Check
       run: cargo check --all-features
