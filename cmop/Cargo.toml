@@ -6,5 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-topological-sort = "0.2.2"
-clap = { version = "4.1.8",  features = ["derive"] }
+topological-sort = "0"
+clap = { version = "4",  features = ["derive"] }
+
+# standard crate data is left out
+[dev-dependencies]
+pretty_assertions = "1"
+toposort-scc = "0"
+petgraph = "0"
