@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod topo_tests {
+    use cmop::stable_topo_sort_inner;
     use petgraph::visit::{Bfs, DfsPostOrder, Topo};
     use petgraph::Graph;
     use std::collections::HashMap;
@@ -286,7 +287,6 @@ mod topo_tests {
         //
 
         // construct main graph
-        //let mut g = r.clone();
         let mut result: Vec<String> = mods.clone().iter().map(|e| (*e).to_owned()).collect();
         println!("{result:?}");
         loop {
@@ -297,8 +297,10 @@ mod topo_tests {
 
         // print
         println!("{result:?}");
-
-        //assert!(checkresult(&result, &rules))
+        assert!(checkresult(
+            &result.iter().map(|e| (*e).as_str()).collect::<Vec<&str>>(),
+            &rules
+        ));
     }
 
     fn petgraph_stable_sort(
@@ -322,6 +324,47 @@ mod topo_tests {
             }
         }
         false
+    }
+
+    #[test]
+    fn test_scc_stable_sort() {
+        let mods = vec!["a", "b", "c", "d", "e", "f"];
+        let rules = vec![("a", "b"), ("b", "c"), ("d", "e"), ("e", "c")];
+
+        let mut g = IndexGraph::with_vertices(mods.len());
+        let mut index_dict: HashMap<&str, usize> = HashMap::new();
+        for (i, m) in mods.iter().enumerate() {
+            index_dict.insert(*m, i);
+        }
+        // add edges
+        let mut edges: Vec<(usize, usize)> = vec![];
+        for (a, b) in &rules {
+            if mods.contains(a) && mods.contains(b) {
+                let idx_a = index_dict[a];
+                let idx_b = index_dict[b];
+                g.add_edge(idx_a, idx_b);
+                edges.push((idx_a, idx_b));
+            }
+        }
+        // sort
+        let sort = g.toposort();
+        assert!(sort.is_some(), "Graph contains a cycle");
+
+        // construct main graph
+        let mut result: Vec<String> = mods.clone().iter().map(|e| (*e).to_owned()).collect();
+        println!("{result:?}");
+        loop {
+            if !stable_topo_sort_inner(mods.len(), &edges, &index_dict, &mut result) {
+                break;
+            }
+        }
+
+        // print
+        println!("{result:?}");
+        assert!(checkresult(
+            &result.iter().map(|e| (*e).as_str()).collect::<Vec<&str>>(),
+            &rules
+        ));
     }
 
     fn checkresult(result: &[&str], rules: &Vec<(&str, &str)>) -> bool {

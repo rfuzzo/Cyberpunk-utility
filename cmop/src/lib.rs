@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::BufRead;
 use std::io::{self};
 use std::path::Path;
-use topological_sort::TopologicalSort;
+use toposort_scc::IndexGraph;
 
 #[derive(Default)]
 pub struct Rules {
@@ -15,31 +16,58 @@ enum RuleKind {
     //Note,
 }
 
-// sort the strings according to pairs
-pub fn topo_sort(input: &Vec<String>, rules: &Rules) -> Result<Vec<String>, &'static str> {
-    // Create a new TopologicalSort instance
-    let mut sort = TopologicalSort::<&str>::new();
-
-    // Add all the strings as items
-    for s in input {
-        sort.insert(s.as_ref());
-    }
-
-    // Add all the pairs as dependencies
-    for (a, b) in &rules.order {
-        if input.contains(a) && input.contains(b) {
-            sort.add_dependency(a.as_ref(), b.as_ref());
+pub fn stable_topo_sort_inner(
+    n: usize,
+    edges: &[(usize, usize)],
+    index_dict: &HashMap<&str, usize>,
+    result: &mut Vec<String>,
+) -> bool {
+    for i in 0..n {
+        for j in 0..i {
+            let x = index_dict[result[i].as_str()];
+            let y = index_dict[result[j].as_str()];
+            if edges.contains(&(x, y)) {
+                let t = result[i].clone();
+                result.remove(i);
+                result.insert(j, t);
+                // todo verbose
+                //println!("[{x}-{y}] {result:?}");
+                return true;
+            }
         }
     }
+    false
+}
 
-    // Sort the items and collect them into a vector
-    let mut result: Vec<String> = Vec::new();
-    while let Some(s) = sort.pop() {
-        result.push(s.into());
+pub fn topo_sort(mods: &Vec<String>, rules: &Rules) -> Result<Vec<String>, &'static str> {
+    let mut g = IndexGraph::with_vertices(mods.len());
+    let mut index_dict: HashMap<&str, usize> = HashMap::new();
+    for (i, m) in mods.iter().enumerate() {
+        index_dict.insert(m, i);
+    }
+    // add edges
+    let mut edges: Vec<(usize, usize)> = vec![];
+    for (a, b) in &rules.order {
+        if mods.contains(a) && mods.contains(b) {
+            let idx_a = index_dict[a.as_str()];
+            let idx_b = index_dict[b.as_str()];
+            g.add_edge(idx_a, idx_b);
+            edges.push((idx_a, idx_b));
+        }
+    }
+    // cycle check
+    let sort = g.toposort();
+    if sort.is_none() {
+        return Err("Graph contains a cycle");
     }
 
-    if !sort.is_empty() {
-        return Err("cycle detected");
+    // sort
+    let mut result: Vec<String> = mods.clone().iter().map(|e| (*e).to_owned()).collect();
+    println!("{result:?}");
+    loop {
+        if !stable_topo_sort_inner(mods.len(), &edges, &index_dict, &mut result) {
+            break;
+        }
     }
 
     // Return the sorted vector
