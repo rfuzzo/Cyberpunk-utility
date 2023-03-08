@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  cmop:
+  tweak-doxygen:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,22 +18,22 @@ jobs:
     
     - name: Check
       run: |
-        cd cmop
+        cd tweak-doxygen
         cargo check --all-features
     - name: Format
       run: |
-        cd cmop
+        cd tweak-doxygen
         cargo fmt --all -- --check   
     - name: Clippy
       run: |
-        cd cmop
+        cd tweak-doxygen
         cargo clippy -- -D warnings
       
     - name: Build
       run: |
-        cd cmop
+        cd tweak-doxygen
         cargo build --verbose
     - name: Run tests
       run: |
-        cd cmop
+        cd tweak-doxygen
         cargo test --verbose
