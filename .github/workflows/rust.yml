@@ -41,6 +41,8 @@ jobs:
     runs-on: windows-latest
       steps:
         - uses: actions/checkout@v3
+        - name: unzip resources
+          run: Expand-Archive -Path .\metadata-resources.zip -DestinationPath .\ 
         
         - uses: actions-rs/toolchain@v1
           with:
