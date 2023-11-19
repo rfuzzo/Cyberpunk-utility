@@ -199,6 +199,11 @@ impl eframe::App for TemplateApp {
                     egui::Grid::new("mod_list").num_columns(1).show(ui, |ui| {
                         for k in &self.load_order {
                             if let Some(value) = self.archives.get(k) {
+                                // skip if no conflicts
+                                if value.loses.len() + value.wins.len() == 0 {
+                                    continue;
+                                }
+
                                 let filename = value
                                     .path
                                     .file_name()
