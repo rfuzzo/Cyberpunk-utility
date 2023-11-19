@@ -1,12 +1,7 @@
-use crate::Archive;
+use crate::{fnv1a64_hash_path, get_files, parse_csv_data, Archive};
 extern crate egui;
 
-use std::hash::Hasher;
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use self::egui::Color32;
 
@@ -25,6 +20,8 @@ pub struct TemplateApp {
     game_path: PathBuf,
 
     #[serde(skip)] // This how you opt-out of serialization of a field
+    hashes: HashMap<u64, String>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
     archives: HashMap<u64, ArchiveViewModel>,
     #[serde(skip)] // This how you opt-out of serialization of a field
     load_order: Vec<u64>,
@@ -35,7 +32,7 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            // Example stuff:
+            hashes: HashMap::default(),
             game_path: PathBuf::from(""),
             archives: HashMap::default(),
             conflicts: HashMap::default(),
@@ -123,8 +120,11 @@ impl eframe::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
+        if self.hashes.is_empty() {
+            // load hashes
+            let csv_data = include_bytes!("metadata-resources.csv");
+            self.hashes = parse_csv_data(csv_data);
+        }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -207,7 +207,12 @@ impl eframe::App for TemplateApp {
                                         format!("winning ({})", value.wins.len()),
                                         |ui| {
                                             for h in &value.wins {
-                                                ui.colored_label(Color32::GREEN, h.to_string());
+                                                // resolve hash
+                                                let mut label_text = h.to_string();
+                                                if let Some(file_name) = self.hashes.get(h) {
+                                                    label_text = file_name.to_owned();
+                                                }
+                                                ui.colored_label(Color32::GREEN, label_text);
                                             }
                                         },
                                     );
@@ -215,7 +220,11 @@ impl eframe::App for TemplateApp {
                                         format!("loosing ({})", value.looses.len()),
                                         |ui| {
                                             for h in &value.looses {
-                                                ui.colored_label(Color32::RED, h.to_string());
+                                                let mut label_text = h.to_string();
+                                                if let Some(file_name) = self.hashes.get(h) {
+                                                    label_text = file_name.to_owned();
+                                                }
+                                                ui.colored_label(Color32::RED, label_text);
                                             }
                                         },
                                     );
@@ -228,36 +237,4 @@ impl eframe::App for TemplateApp {
                 });
         });
     }
-}
-
-/// Get top-level files of a folder with given extension
-fn get_files(folder_path: &Path, extension: &str) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    if !folder_path.exists() {
-        return files;
-    }
-
-    if let Ok(entries) = fs::read_dir(folder_path) {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_file() {
-                    if let Some(ext) = entry.path().extension() {
-                        if ext == extension {
-                            files.push(entry.path());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    files
-}
-
-/// Calculate FNV1a64 hash of a PathBuf
-fn fnv1a64_hash_path(path: &Path) -> u64 {
-    let path_string = path.to_string_lossy();
-    let mut hasher = fnv::FnvHasher::default();
-    hasher.write(path_string.as_bytes());
-    hasher.finish()
 }

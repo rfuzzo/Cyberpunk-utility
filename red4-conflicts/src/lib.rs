@@ -5,10 +5,11 @@ extern crate byteorder;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
+use std::hash::Hasher;
 use std::io::{self, Cursor, Read, Result};
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub use app::TemplateApp;
 
@@ -163,4 +164,62 @@ impl FileEntry {
 #[derive(Debug, Clone, Copy)]
 pub struct Dependency {
     pub hash: u64,
+}
+
+/// Get top-level files of a folder with given extension
+fn get_files(folder_path: &Path, extension: &str) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if !folder_path.exists() {
+        return files;
+    }
+
+    if let Ok(entries) = fs::read_dir(folder_path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    if let Some(ext) = entry.path().extension() {
+                        if ext == extension {
+                            files.push(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    files
+}
+
+/// Calculate FNV1a64 hash of a PathBuf
+fn fnv1a64_hash_path(path: &Path) -> u64 {
+    let path_string = path.to_string_lossy();
+    let mut hasher = fnv::FnvHasher::default();
+    hasher.write(path_string.as_bytes());
+    hasher.finish()
+}
+
+/// Reads the metadata-resources.csv (csv of hashes and strings) from https://www.cyberpunk.net/en/modding-support
+fn parse_csv_data(csv_data: &[u8]) -> HashMap<u64, String> {
+    let mut reader = csv::ReaderBuilder::new().from_reader(csv_data);
+    let mut csv_map: HashMap<u64, String> = HashMap::new();
+
+    for result in reader.records() {
+        match result {
+            Ok(record) => {
+                // Assuming the CSV has two columns: String and u64
+                if let (Some(path), Some(hash_str)) = (record.get(0), record.get(1)) {
+                    if let Ok(hash) = hash_str.parse::<u64>() {
+                        csv_map.insert(hash, path.to_string());
+                    } else {
+                        eprintln!("Error parsing u64 value: {}", hash_str);
+                    }
+                } else {
+                    eprintln!("Malformed CSV record: {:?}", record);
+                }
+            }
+            Err(err) => eprintln!("Error reading CSV record: {}", err),
+        }
+    }
+
+    csv_map
 }
