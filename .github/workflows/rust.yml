@@ -36,12 +36,15 @@ jobs:
       run: |
         cd tweak-doxygen
         cargo test --verbose
+        
   red4-conflicts:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - name: unzip resources
-        run: Expand-Archive -Path .\metadata-resources.zip -DestinationPath .\ 
+        run: |
+          cd red4-conflicts\src
+          Expand-Archive -Path .\metadata-resources.zip -DestinationPath .\
       
       - uses: actions-rs/toolchain@v1
         with:
@@ -49,12 +52,12 @@ jobs:
           toolchain: stable
           override: true
         
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+      - name: Build
+        run: |
+          cd red4-conflicts
+          cargo build --release
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3
         with:
-          path: target/release/red4-conflicts.exe
+          path: red4-conflicts/src/target/release/red4-conflicts.exe
