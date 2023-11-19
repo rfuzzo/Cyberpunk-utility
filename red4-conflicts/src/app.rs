@@ -9,7 +9,7 @@ struct ArchiveViewModel {
     pub path: PathBuf,
     //pub hashes: HashMap<u64, String>,
     pub wins: Vec<u64>,
-    pub looses: Vec<u64>,
+    pub loses: Vec<u64>,
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -77,7 +77,7 @@ impl TemplateApp {
                     path: f.to_owned(),
                     //hashes: HashMap::default(),
                     wins: vec![],
-                    looses: vec![],
+                    loses: vec![],
                 };
 
                 for hash in hashes {
@@ -85,10 +85,16 @@ impl TemplateApp {
                         // found a conflict
                         // update vms
                         for archive in archive_names.iter() {
-                            self.archives.get_mut(archive).unwrap().looses.push(hash);
+                            if !self.archives.get(archive).unwrap().loses.contains(&hash) {
+                                self.archives.get_mut(archive).unwrap().loses.push(hash);
+                            }
                         }
-                        archive_names.push(archive_hash);
-                        vm.wins.push(hash);
+                        if !archive_names.contains(&archive_hash) {
+                            archive_names.push(archive_hash);
+                        }
+                        if !vm.wins.contains(&hash) {
+                            vm.wins.push(hash);
+                        }
                     } else {
                         // first occurance
                         conflict_map.insert(hash, vec![archive_hash]);
@@ -217,9 +223,9 @@ impl eframe::App for TemplateApp {
                                         },
                                     );
                                     ui.collapsing(
-                                        format!("loosing ({})", value.looses.len()),
+                                        format!("losing ({})", value.loses.len()),
                                         |ui| {
-                                            for h in &value.looses {
+                                            for h in &value.loses {
                                                 let mut label_text = h.to_string();
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
