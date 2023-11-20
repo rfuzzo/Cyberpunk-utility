@@ -1,7 +1,7 @@
 use crate::{fnv1a64_hash_path, get_files, parse_csv_data, Archive};
 extern crate egui;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, env, path::PathBuf};
 
 use self::egui::Color32;
 
@@ -16,16 +16,15 @@ struct ArchiveViewModel {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
-    // Example stuff:
+    #[serde(skip)] // This how you opt-out of serialization of a field
     game_path: PathBuf,
-
-    #[serde(skip)] // This how you opt-out of serialization of a field
+    #[serde(skip)]
     hashes: HashMap<u64, String>,
-    #[serde(skip)] // This how you opt-out of serialization of a field
+    #[serde(skip)]
     archives: HashMap<u64, ArchiveViewModel>,
-    #[serde(skip)] // This how you opt-out of serialization of a field
+    #[serde(skip)]
     load_order: Vec<u64>,
-    #[serde(skip)] // This how you opt-out of serialization of a field
+    #[serde(skip)]
     conflicts: HashMap<u64, Vec<u64>>,
 }
 
@@ -139,6 +138,14 @@ impl eframe::App for TemplateApp {
             self.hashes = parse_csv_data(csv_data);
         }
 
+        // set game path to cwd
+        if !self.game_path.exists() {
+            if let Ok(current_dir) = env::current_dir() {
+                self.game_path = PathBuf::from(current_dir);
+                // special cp77 dir
+            }
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
@@ -156,22 +163,23 @@ impl eframe::App for TemplateApp {
             });
         });
 
-        let mods = get_files(&self.game_path, "archive");
+        let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
+        // load order
+        mods.sort_by(|a, b| {
+            a.to_string_lossy()
+                .as_bytes()
+                .cmp(b.to_string_lossy().as_bytes())
+        });
 
         egui::SidePanel::left("left_panel").show(ctx, |ui| {
-            ui.heading("Installed Mods");
+            ui.heading("Load Order");
+            ui.label("Higher overrides");
             ui.separator();
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 egui::Grid::new("mod_list").show(ui, |ui| {
                     for f in mods.iter() {
-                        ui.label(
-                            f.file_name()
-                                .unwrap()
-                                .to_ascii_lowercase()
-                                .to_str()
-                                .unwrap(),
-                        );
+                        ui.label(f.file_name().unwrap().to_string_lossy());
                         ui.end_row();
                     }
                 });

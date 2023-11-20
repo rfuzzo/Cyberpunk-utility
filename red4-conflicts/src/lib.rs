@@ -331,3 +331,32 @@ fn parse_csv_data(csv_data: &[u8]) -> HashMap<u64, String> {
 
     csv_map
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn load_order() {
+        let mut input = [
+            "#.archive",
+            "_.archive",
+            "aa.archive",
+            "zz.archive",
+            "AA.archive",
+            "ZZ.archive",
+        ];
+        let correct = [
+            "#.archive",
+            "AA.archive",
+            "ZZ.archive",
+            "_.archive",
+            "aa.archive",
+            "zz.archive",
+        ];
+
+        input.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+        //input.sort();
+        assert_eq!(correct, input);
+    }
+}
