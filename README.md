@@ -10,3 +10,8 @@ A small rust utility to convert and strip tweak records (<https://github.com/CDP
 tweakdox <SOURCE> <OUT>
 ```
 
+## RED4-Conflicts
+
+A conflict-checker app for Cyberpunk 2077 archives.
+
+![screenshot](./assets/red4_conflicts_01.png)

@@ -40,7 +40,11 @@ jobs:
   red4-conflicts:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+
       - name: unzip resources
         run: |
           cd red4-conflicts\src

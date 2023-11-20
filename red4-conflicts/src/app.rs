@@ -191,7 +191,7 @@ impl eframe::App for TemplateApp {
             ui.separator();
             // -------------------
             ui.horizontal(|ui| {
-                ui.label("Game path");
+                ui.label("Archives path");
                 let mut path_str = self.game_path.to_str().unwrap();
                 ui.text_edit_singleline(&mut path_str);
                 if ui.button("...").clicked() {
