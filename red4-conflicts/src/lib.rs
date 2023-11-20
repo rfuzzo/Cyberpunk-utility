@@ -13,6 +13,17 @@ use std::path::{Path, PathBuf};
 
 pub use app::TemplateApp;
 
+#[link(name = "kraken_static")]
+extern "C" {
+    // EXPORT int Kraken_Decompress(const byte *src, size_t src_len, byte *dst, size_t dst_len)
+    fn Kraken_Decompress(
+        buffer: *const u8,
+        bufferSize: i64,
+        outputBuffer: *mut u8,
+        outputBufferSize: i64,
+    ) -> i32;
+}
+
 #[derive(Debug, Clone)]
 pub struct Archive {
     pub header: Header,
@@ -37,6 +48,8 @@ impl Archive {
 
         let mut cursor = io::Cursor::new(&buffer);
         let header = Header::from_reader(&mut cursor)?;
+
+        // read custom data
 
         // move to offset Header.IndexPosition
         cursor.set_position(header.index_position);

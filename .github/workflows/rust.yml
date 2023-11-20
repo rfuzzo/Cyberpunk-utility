@@ -60,4 +60,4 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3
         with:
-          path: red4-conflicts/src/target/release/red4-conflicts.exe
+          path: red4-conflicts/target/release/red4-conflicts.exe
