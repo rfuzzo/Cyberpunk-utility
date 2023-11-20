@@ -5,6 +5,7 @@ extern crate byteorder;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, Cursor, Read, Result};
@@ -28,6 +29,9 @@ extern "C" {
 pub struct Archive {
     pub header: Header,
     pub index: Index,
+
+    // custom
+    pub file_names: Vec<String>,
 }
 
 impl Archive {
@@ -50,12 +54,28 @@ impl Archive {
         let header = Header::from_reader(&mut cursor)?;
 
         // read custom data
+        let mut file_names: Vec<String> = vec![];
+        if let Ok(custom_data_length) = cursor.read_u32::<LittleEndian>() {
+            if custom_data_length > 0 {
+                cursor.set_position(HEADER_EXTENDED_SIZE);
+                if let Ok(footer) = LxrsFooter::from_reader(&mut cursor) {
+                    // add files to hashmap
+                    for f in footer.files {
+                        file_names.push(f);
+                    }
+                }
+            }
+        }
 
         // move to offset Header.IndexPosition
         cursor.set_position(header.index_position);
         let index = Index::from_reader(&mut cursor)?;
 
-        Ok(Archive { header, index })
+        Ok(Archive {
+            header,
+            index,
+            file_names,
+        })
     }
 
     // get filehashes
@@ -70,7 +90,7 @@ impl Archive {
 
 //static HEADER_MAGIC: u32 = 1380009042;
 //static HEADER_SIZE: i32 = 40;
-//static HEADER_EXTENDED_SIZE: i32 = 0xAC;
+static HEADER_EXTENDED_SIZE: u64 = 0xAC;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Header {
@@ -177,6 +197,81 @@ impl FileEntry {
 #[derive(Debug, Clone, Copy)]
 pub struct Dependency {
     pub hash: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct LxrsFooter {
+    pub files: Vec<String>,
+}
+
+impl LxrsFooter {
+    //const MINLEN: u32 = 20;
+    const MAGIC: u32 = 0x4C585253;
+
+    fn from_reader(cursor: &mut Cursor<&Vec<u8>>) -> io::Result<Self> {
+        let magic = cursor.read_u32::<LittleEndian>()?;
+        if magic != LxrsFooter::MAGIC {
+            return Err(io::Error::new(io::ErrorKind::Other, "invalid magic"));
+        }
+        let _version = cursor.read_u32::<LittleEndian>()?;
+        let size = cursor.read_i32::<LittleEndian>()?;
+        let zsize = cursor.read_i32::<LittleEndian>()?;
+        let count = cursor.read_i32::<LittleEndian>()?;
+
+        let mut files: Vec<String> = vec![];
+        if size > zsize {
+            let mut compressed_buffer = Vec::with_capacity(zsize as usize);
+            cursor.read_exact(&mut compressed_buffer[..])?;
+            let output_buffer_size = compressed_buffer.len();
+            let mut output_buffer: Vec<u8> = Vec::with_capacity(output_buffer_size);
+            // buffer is compressed
+            let _result = unsafe {
+                Kraken_Decompress(
+                    compressed_buffer.as_ptr(),
+                    compressed_buffer.len().try_into().unwrap(),
+                    output_buffer.as_mut_ptr(),
+                    output_buffer_size.try_into().unwrap(),
+                )
+            };
+        } else if size < zsize {
+            // error
+            return Err(io::Error::new(io::ErrorKind::Other, "invalid buffer"));
+        } else {
+            // no compression
+            for _i in 0..count {
+                // read NullTerminatedString
+                if let Ok(string) = read_null_terminated_string(cursor) {
+                    files.push(string);
+                }
+            }
+        }
+
+        let footer = LxrsFooter { files };
+
+        Ok(footer)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn read_null_terminated_string<R>(reader: &mut R) -> io::Result<String>
+where
+    R: Read,
+{
+    let mut buffer = Vec::new();
+    let mut byte = [0u8; 1];
+
+    loop {
+        reader.read_exact(&mut byte)?;
+
+        if byte[0] == 0 {
+            break;
+        }
+
+        buffer.push(byte[0]);
+    }
+
+    Ok(String::from_utf8_lossy(&buffer).to_string())
 }
 
 /// Get top-level files of a folder with given extension

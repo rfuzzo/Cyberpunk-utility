@@ -68,6 +68,13 @@ impl TemplateApp {
         mods.reverse();
         for f in mods.iter() {
             if let Ok(archive) = Archive::from_file(f) {
+                // add custom filenames
+                for f in archive.file_names.iter() {
+                    let key = fnv1a64_hash_path(&PathBuf::from(f));
+                    self.hashes.insert(key, f.to_string());
+                }
+
+                // conflicts
                 let mut hashes = archive.get_file_hashes();
                 hashes.sort();
                 let archive_hash = fnv1a64_hash_path(f);
