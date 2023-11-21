@@ -10,33 +10,48 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  tweak-doxygen:
-    runs-on: ubuntu-latest
+  # automated checks
+  check:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
+      fail-fast: true
+      matrix:
+        os: [windows-latest]
+        build_type: [Release]
+        target: [tweak-doxygen, red4-tweak-browser]
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Check
       run: |
-        cd tweak-doxygen
+        cd ${{ matrix.target }}
         cargo check --all-features
     - name: Format
       run: |
-        cd tweak-doxygen
-        cargo fmt --all -- --check   
+        cd ${{ matrix.target }}
+        cargo fmt --all -- --check
     - name: Clippy
       run: |
-        cd tweak-doxygen
+        cd ${{ matrix.target }}
         cargo clippy -- -D warnings
-      
     - name: Build
       run: |
-        cd tweak-doxygen
-        cargo build --verbose
+        cd ${{ matrix.target }}
+        cargo build
     - name: Run tests
       run: |
-        cd tweak-doxygen
-        cargo test --verbose
-        
+        cd ${{ matrix.target }}
+        cargo test
+    
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ${{ matrix.target }}/target/release/${{ matrix.target }}.exe
+  
+  # specific build conditions
   red4-conflicts:
     runs-on: windows-latest
     steps:
