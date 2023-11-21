@@ -2,10 +2,10 @@
 
 mod app;
 extern crate byteorder;
+extern crate log;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, Cursor, Read, Result};
@@ -214,25 +214,39 @@ impl LxrsFooter {
             return Err(io::Error::new(io::ErrorKind::Other, "invalid magic"));
         }
         let _version = cursor.read_u32::<LittleEndian>()?;
-        let size = cursor.read_i32::<LittleEndian>()?;
-        let zsize = cursor.read_i32::<LittleEndian>()?;
+        let size = cursor.read_u32::<LittleEndian>()?;
+        let zsize = cursor.read_u32::<LittleEndian>()?;
         let count = cursor.read_i32::<LittleEndian>()?;
 
         let mut files: Vec<String> = vec![];
         if size > zsize {
-            let mut compressed_buffer = Vec::with_capacity(zsize as usize);
-            cursor.read_exact(&mut compressed_buffer[..])?;
-            let output_buffer_size = compressed_buffer.len();
-            let mut output_buffer: Vec<u8> = Vec::with_capacity(output_buffer_size);
             // buffer is compressed
-            let _result = unsafe {
+            let buffer_len = zsize as usize;
+            let mut compressed_buffer = vec![0; buffer_len];
+            cursor.read_exact(&mut compressed_buffer[..])?;
+
+            let output_buffer_len = size as usize;
+            let mut output_buffer = vec![0; output_buffer_len];
+
+            let result = unsafe {
                 Kraken_Decompress(
                     compressed_buffer.as_ptr(),
-                    compressed_buffer.len().try_into().unwrap(),
+                    compressed_buffer.len() as i64,
                     output_buffer.as_mut_ptr(),
-                    output_buffer_size.try_into().unwrap(),
+                    output_buffer.len() as i64,
                 )
             };
+
+            // read bytes
+            if result as u32 == size {
+                let mut inner_cursor = io::Cursor::new(&output_buffer);
+                for _i in 0..count {
+                    // read NullTerminatedString
+                    if let Ok(string) = read_null_terminated_string(&mut inner_cursor) {
+                        files.push(string);
+                    }
+                }
+            }
         } else if size < zsize {
             // error
             return Err(io::Error::new(io::ErrorKind::Other, "invalid buffer"));

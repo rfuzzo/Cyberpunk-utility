@@ -1,6 +1,6 @@
 [package]
 name = "red4-conflicts"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 egui = "0.23.0"
