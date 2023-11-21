@@ -1,9 +1,7 @@
-use crate::{fnv1a64_hash_path, get_files, parse_csv_data, Archive};
-extern crate egui;
-
 use std::{collections::HashMap, env, path::PathBuf};
 
-use self::egui::Color32;
+use egui::Color32;
+use red4lib::{fnv1a64_hash_path, get_files, get_red4_hashes, Archive};
 
 struct ArchiveViewModel {
     pub path: PathBuf,
@@ -134,8 +132,7 @@ impl eframe::App for TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.hashes.is_empty() {
             // load hashes
-            let csv_data = include_bytes!("metadata-resources.csv");
-            self.hashes = parse_csv_data(csv_data);
+            self.hashes = get_red4_hashes();
         }
 
         // set game path to cwd
