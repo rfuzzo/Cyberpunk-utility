@@ -20,7 +20,7 @@ jobs:
       matrix:
         os: [windows-latest]
         build_type: [Release]
-        target: [tweak-doxygen, red4-tweak-browser]
+        target: [tweak-doxygen, red4-tweak-browser, red4-conflicts]
 
     steps:
     - uses: actions/checkout@v3
@@ -50,33 +50,3 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         path: ${{ matrix.target }}/target/release/${{ matrix.target }}.exe
-  
-  # specific build conditions
-  red4-conflicts:
-    runs-on: windows-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: 'true'
-
-      - name: unzip resources
-        run: |
-          cd red4-conflicts\src
-          Expand-Archive -Path .\metadata-resources.zip -DestinationPath .\
-      
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-        
-      - name: Build
-        run: |
-          cd red4-conflicts
-          cargo build --release
-
-      - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          path: red4-conflicts/target/release/red4-conflicts.exe
