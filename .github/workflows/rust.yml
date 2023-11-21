@@ -40,7 +40,7 @@ jobs:
     - name: Build
       run: |
         cd ${{ matrix.target }}
-        cargo build
+        cargo build --${{ matrix.build_type }}
     - name: Run tests
       run: |
         cd ${{ matrix.target }}
@@ -49,4 +49,4 @@ jobs:
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3
       with:
-        path: ${{ matrix.target }}/target/release/${{ matrix.target }}.exe
+        path: ${{ matrix.target }}/target/${{ matrix.build_type }}/${{ matrix.target }}.exe
