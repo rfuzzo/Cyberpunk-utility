@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use egui::Color32;
-use red4lib::{fnv1a64_hash_path, get_files, get_red4_hashes, Archive};
+use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files, get_red4_hashes, Archive};
 
 struct ArchiveViewModel {
     pub path: PathBuf,
@@ -72,7 +72,7 @@ impl TemplateApp {
             if let Ok(archive) = Archive::from_file(f) {
                 // add custom filenames
                 for f in archive.file_names.iter() {
-                    let key = fnv1a64_hash_path(&PathBuf::from(f));
+                    let key = fnv1a64_hash_string(f);
                     self.hashes.insert(key, f.to_string());
                 }
 
