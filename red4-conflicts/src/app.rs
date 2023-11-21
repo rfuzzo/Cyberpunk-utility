@@ -38,6 +38,9 @@ impl Default for TemplateApp {
     }
 }
 
+const CARGO_VERSION: &str = env!("CARGO_PKG_VERSION");
+//const CARGO_NAME: &str = env!("CARGO_PKG_NAME");
+
 impl TemplateApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -64,6 +67,8 @@ impl TemplateApp {
         // scan
         mods.reverse();
         for f in mods.iter() {
+            log::info!("parsing {}", f.display());
+
             if let Ok(archive) = Archive::from_file(f) {
                 // add custom filenames
                 for f in archive.file_names.iter() {
@@ -149,6 +154,12 @@ impl eframe::App for TemplateApp {
                 #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
                 {
                     ui.menu_button("File", |ui| {
+                        // if ui.button("Open log").clicked() {
+                        //     let _ = open::that(format!("{}.log", CARGO_NAME));
+
+                        //     ui.close_menu();
+                        // }
+                        // ui.separator();
                         if ui.button("Quit").clicked() {
                             _frame.close();
                         }
@@ -157,6 +168,9 @@ impl eframe::App for TemplateApp {
                 }
 
                 egui::widgets::global_dark_light_mode_buttons(ui);
+
+                egui::warn_if_debug_build(ui);
+                ui.label(format!("v{}", CARGO_VERSION));
             });
         });
 

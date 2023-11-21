@@ -13,9 +13,11 @@ eframe = { version = "0.23.0", default-features = false, features = [
 log = "0.4"
 rfd = "0.12"
 serde = { version = "1", features = ["derive"] }
-env_logger = "0.10"
+simple-logging = "2.0"
+open = "5.0"
 
 [patch.crates-io]
 
 [dependencies.red4lib]
-git = "https://github.com/rfuzzo/red4lib"
+#git = "https://github.com/rfuzzo/red4lib"
+path = "C:\\GitHub\\__rfuzzo\\red4lib"
