@@ -1,134 +1,11 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use egui::Color32;
-use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files, get_red4_hashes, Archive};
+use red4lib::{get_files, get_red4_hashes};
 
-struct ArchiveViewModel {
-    pub path: PathBuf,
-    /// file hashes
-    pub wins: Vec<u64>,
-    /// file hashes
-    pub loses: Vec<u64>,
-}
-
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
-    #[serde(skip)] // This how you opt-out of serialization of a field
-    game_path: PathBuf,
-    #[serde(skip)]
-    hashes: HashMap<u64, String>,
-    #[serde(skip)]
-    archives: HashMap<u64, ArchiveViewModel>,
-    /// archive hash load order
-    #[serde(skip)]
-    load_order: Vec<u64>,
-    /// map of file hashes to archive hashes
-    #[serde(skip)]
-    conflicts: HashMap<u64, Vec<u64>>,
-}
-
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            hashes: HashMap::default(),
-            game_path: PathBuf::from(""),
-            archives: HashMap::default(),
-            conflicts: HashMap::default(),
-            load_order: vec![],
-        }
-    }
-}
+use crate::{ArchiveViewModel, ETooltipVisuals, TemplateApp};
 
 const CARGO_VERSION: &str = env!("CARGO_PKG_VERSION");
-//const CARGO_NAME: &str = env!("CARGO_PKG_NAME");
-
-impl TemplateApp {
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
-    }
-
-    fn generate_conflict_map(&mut self, mut mods: Vec<PathBuf>) {
-        self.load_order.clear();
-        self.archives.clear();
-        self.conflicts.clear();
-
-        let mut conflict_map: HashMap<u64, Vec<u64>> = HashMap::default();
-        let mut temp_load_order: Vec<u64> = vec![];
-
-        // scan
-        mods.reverse();
-        for f in mods.iter() {
-            log::info!("parsing {}", f.display());
-
-            if let Ok(archive) = Archive::from_file(f) {
-                // add custom filenames
-                for f in archive.file_names.iter() {
-                    let key = fnv1a64_hash_string(f);
-                    self.hashes.insert(key, f.to_string());
-                }
-
-                // conflicts
-                let mut hashes = archive.get_file_hashes();
-                hashes.sort();
-                let archive_hash = fnv1a64_hash_path(f);
-                temp_load_order.push(archive_hash);
-
-                let mut vm = ArchiveViewModel {
-                    path: f.to_owned(),
-                    //hashes: HashMap::default(),
-                    wins: vec![],
-                    loses: vec![],
-                };
-
-                for hash in hashes {
-                    if let Some(archive_names) = conflict_map.get_mut(&hash) {
-                        // found a conflict
-                        // update vms
-                        for archive in archive_names.iter() {
-                            if !self.archives.get(archive).unwrap().loses.contains(&hash) {
-                                self.archives.get_mut(archive).unwrap().loses.push(hash);
-                            }
-                        }
-                        if !archive_names.contains(&archive_hash) {
-                            archive_names.push(archive_hash);
-                        }
-                        if !vm.wins.contains(&hash) {
-                            vm.wins.push(hash);
-                        }
-                    } else {
-                        // first occurance
-                        conflict_map.insert(hash, vec![archive_hash]);
-                    }
-                }
-
-                self.archives.insert(archive_hash, vm);
-            }
-        }
-
-        // clean list
-        let mut conflicts: HashMap<u64, Vec<u64>> = HashMap::default();
-        for (hash, archives) in conflict_map.iter().filter(|p| p.1.len() > 1) {
-            // insert
-            conflicts.insert(*hash, archives.clone());
-        }
-
-        temp_load_order.reverse();
-        self.conflicts = conflicts;
-        self.load_order = temp_load_order;
-    }
-}
 
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
@@ -151,31 +28,7 @@ impl eframe::App for TemplateApp {
             }
         }
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-                {
-                    ui.menu_button("File", |ui| {
-                        // if ui.button("Open log").clicked() {
-                        //     let _ = open::that(format!("{}.log", CARGO_NAME));
-
-                        //     ui.close_menu();
-                        // }
-                        // ui.separator();
-                        if ui.button("Quit").clicked() {
-                            _frame.close();
-                        }
-                    });
-                    ui.add_space(16.0);
-                }
-
-                egui::widgets::global_dark_light_mode_buttons(ui);
-
-                egui::warn_if_debug_build(ui);
-                ui.label(format!("v{}", CARGO_VERSION));
-            });
-        });
+        top_panel(ctx, _frame);
 
         let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
         // load order
@@ -222,7 +75,40 @@ impl eframe::App for TemplateApp {
             }
 
             ui.separator();
-            egui::ScrollArea::vertical()
+            ui.horizontal(|ui| {
+                ui.label("Filter: ");
+                ui.text_edit_singleline(&mut self.text_filter);
+                if ui.button("x").clicked() {
+                    self.text_filter.clear();
+                }
+                ui.separator();
+                ui.checkbox(&mut self.show_no_conflicts, "Show not conflicting files");
+                egui::ComboBox::from_label("Select one!")
+                    .selected_text(format!("{:?}", &mut self.tooltips_visuals))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.tooltips_visuals,
+                            ETooltipVisuals::Tooltip,
+                            "Tooltip",
+                        );
+                        ui.selectable_value(
+                            &mut self.tooltips_visuals,
+                            ETooltipVisuals::Inline,
+                            "Inline",
+                        );
+                        ui.selectable_value(
+                            &mut self.tooltips_visuals,
+                            ETooltipVisuals::Collapsing,
+                            "Collapsing",
+                        );
+                    });
+            });
+            ui.label(format!(
+                "Found {} conflicts across {} archives",
+                self.conflicts.len(),
+                self.load_order.len()
+            ));
+            egui::ScrollArea::both()
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
                     egui::Grid::new("mod_list").num_columns(1).show(ui, |ui| {
@@ -242,9 +128,44 @@ impl eframe::App for TemplateApp {
                                     .unwrap()
                                     .to_owned();
 
-                                ui.collapsing(filename, |ui| {
+                                // text filter
+                                if !self.text_filter.is_empty()
+                                    && !filename
+                                        .to_lowercase()
+                                        .contains(&self.text_filter.to_lowercase())
+                                {
+                                    continue;
+                                }
+
+                                let filename_ext = if !self.show_no_conflicts {
+                                    format!(
+                                        "{} (w: {}, l: {})",
+                                        filename,
+                                        value.wins.len(),
+                                        value.loses.len()
+                                    )
+                                } else {
+                                    format!(
+                                        "{} (w: {}, l: {}, u: {})",
+                                        filename,
+                                        value.wins.len(),
+                                        value.loses.len(),
+                                        value.get_no_conflicts().len()
+                                    )
+                                };
+
+                                ui.collapsing(filename_ext, |ui| {
+                                    let mut header_color = if value.wins.is_empty() {
+                                        ui.visuals().text_color()
+                                    } else {
+                                        Color32::GREEN
+                                    };
                                     ui.collapsing(
-                                        format!("winning ({})", value.wins.len()),
+                                        egui::RichText::new(format!(
+                                            "winning ({})",
+                                            value.wins.len()
+                                        ))
+                                        .color(header_color),
                                         |ui| {
                                             for h in &value.wins {
                                                 // resolve hash
@@ -253,82 +174,120 @@ impl eframe::App for TemplateApp {
                                                     label_text = file_name.to_owned();
                                                 }
 
-                                                //ui.colored_label(Color32::GREEN, label_text);
-                                                ui.collapsing(
-                                                    egui::RichText::new(label_text)
-                                                        .color(Color32::GREEN),
-                                                    |ui| {
-                                                        // get archive names
-                                                        if let Some(archives) =
-                                                            self.conflicts.get(h)
-                                                        {
-                                                            for archive_hash in archives {
-                                                                if archive_hash == k {
-                                                                    continue;
-                                                                }
-
-                                                                let mut archive_name =
-                                                                    archive_hash.to_string();
-                                                                if let Some(archive_vm) =
-                                                                    self.archives.get(archive_hash)
-                                                                {
-                                                                    archive_name = archive_vm
-                                                                        .path
-                                                                        .file_name()
-                                                                        .unwrap()
-                                                                        .to_string_lossy()
-                                                                        .to_string();
-                                                                }
-                                                                ui.label(archive_name);
-                                                            }
-                                                        }
-                                                    },
-                                                );
+                                                let color = Color32::GREEN;
+                                                match self.tooltips_visuals {
+                                                    crate::ETooltipVisuals::Tooltip => {
+                                                        show_tooltip(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                    crate::ETooltipVisuals::Inline => {
+                                                        show_inline(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                    crate::ETooltipVisuals::Collapsing => {
+                                                        show_dropdown_filelist(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                }
                                             }
                                         },
                                     );
+
+                                    header_color = if value.loses.is_empty() {
+                                        ui.visuals().text_color()
+                                    } else {
+                                        Color32::RED
+                                    };
                                     ui.collapsing(
-                                        format!("losing ({})", value.loses.len()),
+                                        egui::RichText::new(format!(
+                                            "losing ({})",
+                                            value.loses.len()
+                                        ))
+                                        .color(header_color),
                                         |ui| {
                                             for h in &value.loses {
                                                 let mut label_text = h.to_string();
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
                                                 }
-                                                //ui.colored_label(Color32::RED, label_text);
-                                                ui.collapsing(
-                                                    egui::RichText::new(label_text)
-                                                        .color(Color32::RED),
-                                                    |ui| {
-                                                        // get archive names
-                                                        if let Some(archives) =
-                                                            self.conflicts.get(h)
-                                                        {
-                                                            for archive_hash in archives {
-                                                                if archive_hash == k {
-                                                                    continue;
-                                                                }
 
-                                                                let mut archive_name =
-                                                                    archive_hash.to_string();
-                                                                if let Some(archive_vm) =
-                                                                    self.archives.get(archive_hash)
-                                                                {
-                                                                    archive_name = archive_vm
-                                                                        .path
-                                                                        .file_name()
-                                                                        .unwrap()
-                                                                        .to_string_lossy()
-                                                                        .to_string();
-                                                                }
-                                                                ui.label(archive_name);
-                                                            }
-                                                        }
-                                                    },
-                                                );
+                                                let color = Color32::RED;
+                                                match self.tooltips_visuals {
+                                                    crate::ETooltipVisuals::Tooltip => {
+                                                        show_tooltip(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                    crate::ETooltipVisuals::Inline => {
+                                                        show_inline(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                    crate::ETooltipVisuals::Collapsing => {
+                                                        show_dropdown_filelist(
+                                                            ui,
+                                                            label_text,
+                                                            h,
+                                                            k,
+                                                            &self.conflicts,
+                                                            &self.archives,
+                                                            color,
+                                                        );
+                                                    }
+                                                }
                                             }
                                         },
                                     );
+                                    if self.show_no_conflicts {
+                                        ui.collapsing(
+                                            format!(
+                                                "no conflicts ({})",
+                                                value.get_no_conflicts().len()
+                                            ),
+                                            |ui| {
+                                                for h in &value.get_no_conflicts() {
+                                                    let mut label_text = h.to_string();
+                                                    if let Some(file_name) = self.hashes.get(h) {
+                                                        label_text = file_name.to_owned();
+                                                    }
+                                                    ui.label(label_text);
+                                                }
+                                            },
+                                        );
+                                    }
                                 });
 
                                 ui.end_row();
@@ -338,4 +297,131 @@ impl eframe::App for TemplateApp {
                 });
         });
     }
+}
+
+fn show_inline(
+    ui: &mut egui::Ui,
+    label_text: String,
+    h: &u64,
+    k: &u64,
+    conflicts: &HashMap<u64, Vec<u64>>,
+    archive_map: &HashMap<u64, ArchiveViewModel>,
+    color: Color32,
+) {
+    ui.horizontal(|ui| {
+        ui.colored_label(color, label_text);
+        // get archive names
+        if let Some(archives) = conflicts.get(h) {
+            for archive_hash in archives {
+                if archive_hash == k {
+                    continue;
+                }
+
+                let mut archive_name = archive_hash.to_string();
+                if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_name = archive_vm
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                }
+                ui.label(archive_name);
+            }
+        }
+    });
+}
+
+fn show_tooltip(
+    ui: &mut egui::Ui,
+    label_text: String,
+    h: &u64,
+    k: &u64,
+    conflicts: &HashMap<u64, Vec<u64>>,
+    archive_map: &HashMap<u64, ArchiveViewModel>,
+    color: Color32,
+) {
+    let r = ui.colored_label(color, label_text);
+    r.on_hover_ui(|ui| {
+        // get archive names
+        if let Some(archives) = conflicts.get(h) {
+            for archive_hash in archives {
+                if archive_hash == k {
+                    continue;
+                }
+
+                let mut archive_name = archive_hash.to_string();
+                if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_name = archive_vm
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                }
+                ui.label(archive_name);
+            }
+        }
+    });
+}
+
+fn show_dropdown_filelist(
+    ui: &mut egui::Ui,
+    label_text: String,
+    h: &u64,
+    k: &u64,
+    conflicts: &HashMap<u64, Vec<u64>>,
+    archive_map: &HashMap<u64, ArchiveViewModel>,
+    color: Color32,
+) {
+    ui.collapsing(egui::RichText::new(label_text).color(color), |ui| {
+        // get archive names
+        if let Some(archives) = conflicts.get(h) {
+            for archive_hash in archives {
+                if archive_hash == k {
+                    continue;
+                }
+
+                let mut archive_name = archive_hash.to_string();
+                if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_name = archive_vm
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                }
+                ui.separator();
+                ui.label(archive_name);
+            }
+        }
+    });
+}
+
+fn top_panel(ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        // The top panel is often a good place for a menu bar:
+        egui::menu::bar(ui, |ui| {
+            #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
+            {
+                ui.menu_button("File", |ui| {
+                    // if ui.button("Open log").clicked() {
+                    //     let _ = open::that(format!("{}.log", CARGO_NAME));
+
+                    //     ui.close_menu();
+                    // }
+                    // ui.separator();
+                    if ui.button("Quit").clicked() {
+                        _frame.close();
+                    }
+                });
+                ui.add_space(16.0);
+            }
+
+            egui::widgets::global_dark_light_mode_buttons(ui);
+
+            egui::warn_if_debug_build(ui);
+            ui.label(format!("v{}", CARGO_VERSION));
+        });
+    });
 }

@@ -20,7 +20,7 @@ A conflict-checker app for Cyberpunk 2077 archives.
 - run `red4-conflicts.exe` and specify a folder with archives to check
 
 ### Screenshots
-![screenshot](./assets/red4_conflicts_01.png)
+![screenshot](./assets/red4_conflicts_02.png)
 
 ## Cyberpunk-Tweak Util
 A small app to display various tweak-related info.
