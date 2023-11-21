@@ -5,8 +5,9 @@ use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files, get_red4_hashes
 
 struct ArchiveViewModel {
     pub path: PathBuf,
-    //pub hashes: HashMap<u64, String>,
+    /// file hashes
     pub wins: Vec<u64>,
+    /// file hashes
     pub loses: Vec<u64>,
 }
 
@@ -20,8 +21,10 @@ pub struct TemplateApp {
     hashes: HashMap<u64, String>,
     #[serde(skip)]
     archives: HashMap<u64, ArchiveViewModel>,
+    /// archive hash load order
     #[serde(skip)]
     load_order: Vec<u64>,
+    /// map of file hashes to archive hashes
     #[serde(skip)]
     conflicts: HashMap<u64, Vec<u64>>,
 }
@@ -249,7 +252,38 @@ impl eframe::App for TemplateApp {
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
                                                 }
-                                                ui.colored_label(Color32::GREEN, label_text);
+
+                                                //ui.colored_label(Color32::GREEN, label_text);
+                                                ui.collapsing(
+                                                    egui::RichText::new(label_text)
+                                                        .color(Color32::GREEN),
+                                                    |ui| {
+                                                        // get archive names
+                                                        if let Some(archives) =
+                                                            self.conflicts.get(h)
+                                                        {
+                                                            for archive_hash in archives {
+                                                                if archive_hash == k {
+                                                                    continue;
+                                                                }
+
+                                                                let mut archive_name =
+                                                                    archive_hash.to_string();
+                                                                if let Some(archive_vm) =
+                                                                    self.archives.get(archive_hash)
+                                                                {
+                                                                    archive_name = archive_vm
+                                                                        .path
+                                                                        .file_name()
+                                                                        .unwrap()
+                                                                        .to_string_lossy()
+                                                                        .to_string();
+                                                                }
+                                                                ui.label(archive_name);
+                                                            }
+                                                        }
+                                                    },
+                                                );
                                             }
                                         },
                                     );
@@ -261,7 +295,37 @@ impl eframe::App for TemplateApp {
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
                                                 }
-                                                ui.colored_label(Color32::RED, label_text);
+                                                //ui.colored_label(Color32::RED, label_text);
+                                                ui.collapsing(
+                                                    egui::RichText::new(label_text)
+                                                        .color(Color32::RED),
+                                                    |ui| {
+                                                        // get archive names
+                                                        if let Some(archives) =
+                                                            self.conflicts.get(h)
+                                                        {
+                                                            for archive_hash in archives {
+                                                                if archive_hash == k {
+                                                                    continue;
+                                                                }
+
+                                                                let mut archive_name =
+                                                                    archive_hash.to_string();
+                                                                if let Some(archive_vm) =
+                                                                    self.archives.get(archive_hash)
+                                                                {
+                                                                    archive_name = archive_vm
+                                                                        .path
+                                                                        .file_name()
+                                                                        .unwrap()
+                                                                        .to_string_lossy()
+                                                                        .to_string();
+                                                                }
+                                                                ui.label(archive_name);
+                                                            }
+                                                        }
+                                                    },
+                                                );
                                             }
                                         },
                                     );

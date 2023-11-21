@@ -1635,7 +1635,7 @@ dependencies = [
 [[package]]
 name = "red4lib"
 version = "0.1.1"
-source = "git+https://github.com/rfuzzo/red4lib#044583b6441ec7ea0a5533a9792a0f8b1fa563f1"
+source = "git+https://github.com/rfuzzo/red4lib#4d09ce0d30df134d3bf5ca4b955aaabb04b1b6e6"
 dependencies = [
  "byteorder",
  "cmake",
