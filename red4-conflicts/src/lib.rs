@@ -5,6 +5,7 @@ extern crate byteorder;
 extern crate log;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hasher;
@@ -219,43 +220,47 @@ impl LxrsFooter {
         let count = cursor.read_i32::<LittleEndian>()?;
 
         let mut files: Vec<String> = vec![];
-        if size > zsize {
-            // buffer is compressed
-            let buffer_len = zsize as usize;
-            let mut compressed_buffer = vec![0; buffer_len];
-            cursor.read_exact(&mut compressed_buffer[..])?;
+        match size.cmp(&zsize) {
+            Ordering::Greater => {
+                // buffer is compressed
+                let buffer_len = zsize as usize;
+                let mut compressed_buffer = vec![0; buffer_len];
+                cursor.read_exact(&mut compressed_buffer[..])?;
 
-            let output_buffer_len = size as usize;
-            let mut output_buffer = vec![0; output_buffer_len];
+                let output_buffer_len = size as usize;
+                let mut output_buffer = vec![0; output_buffer_len];
 
-            let result = unsafe {
-                Kraken_Decompress(
-                    compressed_buffer.as_ptr(),
-                    compressed_buffer.len() as i64,
-                    output_buffer.as_mut_ptr(),
-                    output_buffer.len() as i64,
-                )
-            };
+                let result = unsafe {
+                    Kraken_Decompress(
+                        compressed_buffer.as_ptr(),
+                        compressed_buffer.len() as i64,
+                        output_buffer.as_mut_ptr(),
+                        output_buffer.len() as i64,
+                    )
+                };
 
-            // read bytes
-            if result as u32 == size {
-                let mut inner_cursor = io::Cursor::new(&output_buffer);
-                for _i in 0..count {
-                    // read NullTerminatedString
-                    if let Ok(string) = read_null_terminated_string(&mut inner_cursor) {
-                        files.push(string);
+                // read bytes
+                if result as u32 == size {
+                    let mut inner_cursor = io::Cursor::new(&output_buffer);
+                    for _i in 0..count {
+                        // read NullTerminatedString
+                        if let Ok(string) = read_null_terminated_string(&mut inner_cursor) {
+                            files.push(string);
+                        }
                     }
                 }
             }
-        } else if size < zsize {
-            // error
-            return Err(io::Error::new(io::ErrorKind::Other, "invalid buffer"));
-        } else {
-            // no compression
-            for _i in 0..count {
-                // read NullTerminatedString
-                if let Ok(string) = read_null_terminated_string(cursor) {
-                    files.push(string);
+            Ordering::Less => {
+                // error
+                return Err(io::Error::new(io::ErrorKind::Other, "invalid buffer"));
+            }
+            Ordering::Equal => {
+                // no compression
+                for _i in 0..count {
+                    // read NullTerminatedString
+                    if let Ok(string) = read_null_terminated_string(cursor) {
+                        files.push(string);
+                    }
                 }
             }
         }

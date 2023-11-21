@@ -141,7 +141,7 @@ impl eframe::App for TemplateApp {
         // set game path to cwd
         if !self.game_path.exists() {
             if let Ok(current_dir) = env::current_dir() {
-                self.game_path = PathBuf::from(current_dir);
+                self.game_path = current_dir;
                 // special cp77 dir
             }
         }

@@ -1413,7 +1413,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
 
 [[package]]
-name = "red4_tweak_browser"
+name = "red4-tweak-browser"
 version = "0.3.0"
 dependencies = [
  "eframe",

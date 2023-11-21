@@ -18,8 +18,9 @@ fn main() {
 
     // link
     println!(
-        "cargo:rustc-link-search=native={}",
-        format!("{}/build/bin/CMake/{}", dst.display(), profile)
+        "cargo:rustc-link-search=native={}/build/bin/CMake/{}",
+        dst.display(),
+        profile
     );
     println!("cargo:rustc-link-lib=static=kraken_static");
 }
