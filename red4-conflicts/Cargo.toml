@@ -19,5 +19,5 @@ open = "5.0"
 [patch.crates-io]
 
 [dependencies.red4lib]
-#git = "https://github.com/rfuzzo/red4lib"
-path = "C:\\GitHub\\__rfuzzo\\red4lib"
+git = "https://github.com/rfuzzo/red4lib"
+#path = "C:\\GitHub\\__rfuzzo\\red4lib"
