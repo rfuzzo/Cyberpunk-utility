@@ -56,6 +56,7 @@ pub struct TemplateApp {
     show_no_conflicts: bool,
     tooltips_visuals: ETooltipVisuals,
     theme: Option<ETheme>,
+    enable_modlist: bool,
 
     /// hash DB
     #[serde(skip)]
@@ -93,6 +94,7 @@ impl Default for TemplateApp {
             text_filter: "".into(),
             file_filter: "".into(),
             show_no_conflicts: false,
+            enable_modlist: false,
             tooltips_visuals: ETooltipVisuals::Collapsing,
         }
     }
@@ -217,7 +219,7 @@ impl TemplateApp {
                 .as_bytes()
                 .cmp(b.to_string_lossy().as_bytes())
         });
-        // TODO Redmods
+        // load according to modlist.txt
         let mut final_order: Vec<PathBuf> = vec![];
         let modlist_name = "modlist.txt";
         if let Ok(lines) = Self::read_file_to_vec(&self.game_path.join(modlist_name)) {
@@ -236,11 +238,16 @@ impl TemplateApp {
         } else {
             final_order = mods;
         }
+        // TODO Redmods
 
         self.load_order = Self::pathbuf_to_string_vec(final_order);
     }
 
     fn serialize_load_order(&self) {
+        if !self.enable_modlist {
+            return;
+        }
+
         let modlist_name = "modlist.txt";
         if let Ok(mut file) = std::fs::File::create(self.game_path.join(modlist_name)) {
             for line in &self.load_order {

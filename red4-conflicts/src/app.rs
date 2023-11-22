@@ -38,13 +38,11 @@ impl eframe::App for TemplateApp {
             if &self.load_order != last_load_order {
                 self.generate_conflict_map();
                 self.last_load_order = Some(self.load_order.clone());
-                // serialize to modlist.txt
                 self.serialize_load_order();
             }
         } else {
             self.generate_conflict_map();
             self.last_load_order = Some(self.load_order.clone());
-            // serialize to modlist.txt
             self.serialize_load_order();
         }
         // each frame we check the load order
@@ -70,33 +68,56 @@ impl eframe::App for TemplateApp {
 impl TemplateApp {
     fn load_order_view(&mut self, ui: &mut egui::Ui) {
         ui.heading("Load Order");
+        ui.label("Drag to reorder, higher overrides");
         ui.horizontal(|ui| {
-            ui.label("Drag to reorder, higher overrides");
+            ui.checkbox(&mut self.enable_modlist, "Enable load order re-ordering");
+            let response = ui.button("？");
+            let popup_id = ui.make_persistent_id("my_unique_id");
+            if response.clicked() {
+                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+            }
+            // open info
+            let below = egui::AboveOrBelow::Below;
+            egui::popup::popup_above_or_below_widget(ui, popup_id, &response, below, |ui| {
+                ui.set_min_width(400.0); // if you want to control the size
+                ui.heading("Cyberpunk 2077 load order");
+                ui.label("Archives in Cyberpunk are loaded binary-alphabetically.");
+                ui.label("This means that a mod called \"modaa\" loads before \"modbb\", but \"modA\" loads before \"modaa\" and \"modbb\".");
+                ui.label("Special characters also load according to binary sorting: \"!\" and \"#\" before \"A\", but \"_\" after \"Z\". Check the ASCII character set for more info:");
+                ui.hyperlink("https://en.wikipedia.org/wiki/ASCII#Character_set/");
+                ui.label("All REDmod archives are strictly loaded after archives in the /archive/pc/mod folder.");
+                
+                ui.add_space(16.0);
+                ui.heading("Modlist.txt");
+                ui.label("The game provides a way to adjust archive load order without renaming the files: Archives in \"modlist.txt\" in your /archive/pc/mod folder are loaded according to this list.");
+                ui.label("Reordering mods in this app will generate this file.");
+            });
         });
 
         ui.separator();
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            egui_dnd::dnd(ui, "mod_list_dnd").show_vec(
-                &mut self.load_order,
-                |ui, f, handle, _state| {
-                    ui.horizontal(|ui| {
-                        handle.ui(ui, |ui| {
-                            ui.label("::");
+            if self.enable_modlist {
+                egui_dnd::dnd(ui, "mod_list_dnd").show_vec(
+                    &mut self.load_order,
+                    |ui, f, handle, _state| {
+                        ui.horizontal(|ui| {
+                            handle.ui(ui, |ui| {
+                                ui.label("::");
+                            });
+                            ui.label(f.clone());
                         });
-                        ui.label(f.clone());
-                    });
-                },
-            );
-
-            // ui.separator();
-            // egui::Grid::new("mod_list").show(ui, |ui| {
-            //     let mods = &self.load_order;
-            //     for f in mods.iter() {
-            //         ui.label(f);
-            //         ui.end_row();
-            //     }
-            // });
+                    },
+                );
+            } else {
+                egui::Grid::new("mod_list").show(ui, |ui| {
+                    let mods = &self.load_order;
+                    for f in mods.iter() {
+                        ui.label(f);
+                        ui.end_row();
+                    }
+                });
+            }
         });
     }
 
@@ -117,7 +138,7 @@ impl TemplateApp {
                 }
             }
             // generate conflict map
-            if ui.button("⟳ Re-check conflicts").clicked() && self.game_path.exists() {
+            if ui.button("⟳  Re-check conflicts").clicked() && self.game_path.exists() {
                 self.generate_conflict_map();
             }
         });
@@ -126,7 +147,8 @@ impl TemplateApp {
         // Toolbar
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.show_no_conflicts, "Show not conflicting files");
-            egui::ComboBox::from_label("Conflict style")
+            ui.label("Conflict style");
+            egui::ComboBox::from_id_source("tooltips_visuals")
                 .selected_text(format!("{:?}", &mut self.tooltips_visuals))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
@@ -375,26 +397,35 @@ impl TemplateApp {
     fn menu_bar_view(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // The top panel is often a good place for a menu bar:
         egui::menu::bar(ui, |ui| {
-            #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-            {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Open log").clicked() {
-                        let _ = open::that(format!("{}.log", crate::CARGO_PKG_NAME));
+            ui.menu_button("File", |ui| {
+                if ui.button("Open modlist.txt").clicked() {
+                    let _ = open::that(self.game_path.join("modlist.txt"));
+                    ui.close_menu();
+                }
+                ui.separator();
+                if ui.button("Quit").clicked() {
+                    _frame.close();
+                }
+            });
+            ui.menu_button("About", |ui| {
+                ui.hyperlink("https://github.com/rfuzzo/Cyberpunk-utility/");
+                ui.separator();
+                if ui.button("Open log").clicked() {
+                    let _ = open::that(format!("{}.log", crate::CARGO_PKG_NAME));
 
-                        ui.close_menu();
-                    }
-                    ui.separator();
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
+                    ui.close_menu();
+                }
+            });
+            ui.add_space(16.0);
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                self.global_dark_light_mode_buttons(ui);
+                ui.label("Theme: ");
                 ui.add_space(16.0);
-            }
-
-            self.global_dark_light_mode_buttons(ui);
-
-            egui::warn_if_debug_build(ui);
-            ui.label(format!("v{}", crate::CARGO_PKG_VERSION));
+                ui.separator();
+                egui::warn_if_debug_build(ui);
+                ui.label(format!("v{}", crate::CARGO_PKG_VERSION));
+            });
         });
     }
 
