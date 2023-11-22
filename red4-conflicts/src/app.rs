@@ -1,7 +1,7 @@
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{collections::HashMap, env};
 
 use egui::Color32;
-use red4lib::{get_files, get_red4_hashes};
+use red4lib::{fnv1a64_hash_path, get_red4_hashes};
 
 use crate::{ArchiveViewModel, ETheme, ETooltipVisuals, TemplateApp};
 
@@ -38,11 +38,17 @@ impl eframe::App for TemplateApp {
             if &self.load_order != last_load_order {
                 self.generate_conflict_map();
                 self.last_load_order = Some(self.load_order.clone());
+                // serialize to modlist.txt
+                self.serialize_load_order();
             }
         } else {
             self.generate_conflict_map();
             self.last_load_order = Some(self.load_order.clone());
+            // serialize to modlist.txt
+            self.serialize_load_order();
         }
+        // each frame we check the load order
+        self.set_load_order();
 
         // Menu bar
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -62,31 +68,35 @@ impl eframe::App for TemplateApp {
 }
 
 impl TemplateApp {
-    pub fn get_load_order(&mut self) -> Vec<PathBuf> {
-        let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
-        // load order
-        mods.sort_by(|a, b| {
-            a.to_string_lossy()
-                .as_bytes()
-                .cmp(b.to_string_lossy().as_bytes())
-        });
-        // TODO Redmods, modlist.txt
-        mods
-    }
-
     fn load_order_view(&mut self, ui: &mut egui::Ui) {
         ui.heading("Load Order");
-        ui.label("Higher overrides");
+        ui.horizontal(|ui| {
+            ui.label("Drag to reorder, higher overrides");
+        });
+
         ui.separator();
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            egui::Grid::new("mod_list").show(ui, |ui| {
-                let mods = self.get_load_order();
-                for f in mods.iter() {
-                    ui.label(f.file_name().unwrap().to_string_lossy());
-                    ui.end_row();
-                }
-            });
+            egui_dnd::dnd(ui, "mod_list_dnd").show_vec(
+                &mut self.load_order,
+                |ui, f, handle, _state| {
+                    ui.horizontal(|ui| {
+                        handle.ui(ui, |ui| {
+                            ui.label("::");
+                        });
+                        ui.label(f.clone());
+                    });
+                },
+            );
+
+            // ui.separator();
+            // egui::Grid::new("mod_list").show(ui, |ui| {
+            //     let mods = &self.load_order;
+            //     for f in mods.iter() {
+            //         ui.label(f);
+            //         ui.end_row();
+            //     }
+            // });
         });
     }
 
@@ -162,7 +172,9 @@ impl TemplateApp {
             .auto_shrink([false; 2])
             .show(ui, |ui| {
                 egui::Grid::new("mod_list").num_columns(1).show(ui, |ui| {
-                    for k in &self.load_order {
+                    for archive_name in &self.load_order {
+                        let archive_path = &self.game_path.join(archive_name);
+                        let k = &fnv1a64_hash_path(archive_path);
                         if let Some(value) = self.archives.get(k) {
                             // skip if no conflicts
                             if value.loses.len() + value.wins.len() == 0 {

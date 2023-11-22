@@ -1,8 +1,10 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
+use log::error;
+use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files, Archive};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Write};
 use std::{collections::HashMap, path::PathBuf};
-
-use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, Archive};
 
 mod app;
 
@@ -67,9 +69,9 @@ pub struct TemplateApp {
 
     /// archive hash load order
     #[serde(skip)]
-    load_order: Vec<u64>,
+    load_order: Vec<String>,
     #[serde(skip)]
-    last_load_order: Option<Vec<u64>>,
+    last_load_order: Option<Vec<String>>,
 
     // UI
     #[serde(skip)]
@@ -111,23 +113,22 @@ impl TemplateApp {
         Default::default()
     }
 
-    /// Returns the conflict map of this [`TemplateApp`]. Also sets load order, archives and conflict maps
+    /// Returns the conflict map of this [`TemplateApp`]. Also sets archive and conflict maps
     fn generate_conflict_map(&mut self) {
-        self.load_order.clear();
-        self.last_load_order = None;
         self.archives.clear();
         self.conflicts.clear();
 
-        let mut mods = self.get_load_order();
         let mut conflict_map: HashMap<u64, Vec<u64>> = HashMap::default();
-        let mut temp_load_order: Vec<u64> = vec![];
+        //let mut temp_load_order: Vec<PathBuf> = vec![];
 
         // scan
+        let mut mods = self.load_order.clone();
         mods.reverse();
-        for f in mods.iter() {
-            log::info!("parsing {}", f.display());
+        for archive_name in mods.iter() {
+            let file_path = &self.game_path.join(archive_name);
+            log::info!("parsing {}", file_path.display());
 
-            if let Ok(archive) = Archive::from_file(f) {
+            if let Ok(archive) = Archive::from_file(file_path) {
                 // add custom filenames
                 for f in archive.file_names.iter() {
                     let key = fnv1a64_hash_string(f);
@@ -137,11 +138,11 @@ impl TemplateApp {
                 // conflicts
                 let mut hashes = archive.get_file_hashes();
                 hashes.sort();
-                let archive_hash = fnv1a64_hash_path(f);
-                temp_load_order.push(archive_hash);
+                let archive_hash = fnv1a64_hash_path(file_path);
+                //temp_load_order.push(file_path.to_owned());
 
                 let mut vm = ArchiveViewModel {
-                    path: f.to_owned(),
+                    path: file_path.to_owned(),
                     hashes: hashes.clone(),
                     wins: vec![],
                     loses: vec![],
@@ -182,8 +183,76 @@ impl TemplateApp {
             conflicts.insert(*hash, archives.clone());
         }
 
-        temp_load_order.reverse();
+        //temp_load_order.reverse();
         self.conflicts = conflicts;
-        self.load_order = temp_load_order;
+    }
+
+    fn read_file_to_vec(file_path: &PathBuf) -> io::Result<Vec<String>> {
+        let file = File::open(file_path)?;
+        let reader = BufReader::new(file);
+
+        let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
+
+        Ok(lines)
+    }
+
+    fn pathbuf_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
+        paths
+            .into_iter()
+            .filter_map(|path| {
+                path.file_name()
+                    .map(|filename| filename.to_string_lossy().into_owned())
+            })
+            .collect()
+    }
+
+    /// Clear and regenerate load order
+    pub fn set_load_order(&mut self) {
+        self.load_order.clear();
+
+        let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
+        // load order
+        mods.sort_by(|a, b| {
+            a.to_string_lossy()
+                .as_bytes()
+                .cmp(b.to_string_lossy().as_bytes())
+        });
+        // TODO Redmods
+        let mut final_order: Vec<PathBuf> = vec![];
+        let modlist_name = "modlist.txt";
+        if let Ok(lines) = Self::read_file_to_vec(&self.game_path.join(modlist_name)) {
+            for name in lines {
+                let file_name = self.game_path.join(name);
+                if mods.contains(&file_name) {
+                    final_order.push(file_name.to_owned());
+                }
+            }
+            // add remaining mods last
+            for m in mods {
+                if !final_order.contains(&m) {
+                    final_order.push(m);
+                }
+            }
+        } else {
+            final_order = mods;
+        }
+
+        self.load_order = Self::pathbuf_to_string_vec(final_order);
+    }
+
+    fn serialize_load_order(&self) {
+        let modlist_name = "modlist.txt";
+        if let Ok(mut file) = std::fs::File::create(self.game_path.join(modlist_name)) {
+            for line in &self.load_order {
+                match writeln!(file, "{}", line) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("failed to write line {}", err);
+                    }
+                }
+            }
+        } else {
+            error!("failed to write load order");
+        }
     }
 }
