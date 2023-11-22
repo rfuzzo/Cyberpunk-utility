@@ -6,6 +6,9 @@ use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, Archive};
 
 mod app;
 
+const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+
 struct ArchiveViewModel {
     pub path: PathBuf,
     /// winning file hashes
@@ -36,39 +39,57 @@ enum ETooltipVisuals {
     Collapsing,
 }
 
+#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
+enum ETheme {
+    Dark,
+    Light,
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
-    #[serde(skip)] // This how you opt-out of serialization of a field
     game_path: PathBuf,
+    // UI
+    show_no_conflicts: bool,
+    tooltips_visuals: ETooltipVisuals,
+    theme: Option<ETheme>,
+
+    /// hash DB
     #[serde(skip)]
     hashes: HashMap<u64, String>,
+    /// archive name lookup
     #[serde(skip)]
     archives: HashMap<u64, ArchiveViewModel>,
-    /// archive hash load order
-    #[serde(skip)]
-    load_order: Vec<u64>,
     /// map of file hashes to archive hashes
     #[serde(skip)]
     conflicts: HashMap<u64, Vec<u64>>,
 
+    /// archive hash load order
+    #[serde(skip)]
+    load_order: Vec<u64>,
+    #[serde(skip)]
+    last_load_order: Option<Vec<u64>>,
+
+    // UI
     #[serde(skip)]
     text_filter: String,
-
-    show_no_conflicts: bool,
-    tooltips_visuals: ETooltipVisuals,
+    #[serde(skip)]
+    file_filter: String,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
+            theme: None,
             hashes: HashMap::default(),
             game_path: PathBuf::from(""),
             archives: HashMap::default(),
             conflicts: HashMap::default(),
             load_order: vec![],
+            last_load_order: None,
             text_filter: "".into(),
+            file_filter: "".into(),
             show_no_conflicts: false,
             tooltips_visuals: ETooltipVisuals::Collapsing,
         }
@@ -90,11 +111,14 @@ impl TemplateApp {
         Default::default()
     }
 
-    fn generate_conflict_map(&mut self, mut mods: Vec<PathBuf>) {
+    /// Returns the conflict map of this [`TemplateApp`]. Also sets load order, archives and conflict maps
+    fn generate_conflict_map(&mut self) {
         self.load_order.clear();
+        self.last_load_order = None;
         self.archives.clear();
         self.conflicts.clear();
 
+        let mut mods = self.get_load_order();
         let mut conflict_map: HashMap<u64, Vec<u64>> = HashMap::default();
         let mut temp_load_order: Vec<u64> = vec![];
 
