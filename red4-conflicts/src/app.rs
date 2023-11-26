@@ -33,6 +33,8 @@ impl eframe::App for TemplateApp {
             }
         }
 
+        // each frame we check the load order
+        self.set_load_order();
         // auto-generate hashes on first load and load order change
         if let Some(last_load_order) = &self.last_load_order {
             if &self.load_order != last_load_order {
@@ -45,8 +47,7 @@ impl eframe::App for TemplateApp {
             self.last_load_order = Some(self.load_order.clone());
             self.serialize_load_order();
         }
-        // each frame we check the load order
-        self.set_load_order();
+       
 
         // Menu bar
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
