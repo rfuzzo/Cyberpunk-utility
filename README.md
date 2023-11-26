@@ -2,16 +2,9 @@
 
 Some utility tools for Cyberpunk 2077 modding.
 
-## Tweak-Doxygen
-
-A small rust utility to convert and strip tweak records (<https://github.com/CDPR-Modding-Documentation/Cyberpunk-Tweaks>) to a c# class hierarchy for use with doxygen: <https://cdpr-modding-documentation.github.io/Cyberpunk-Tweaks/>
-
-### Usage
-```cmd
-tweakdox <SOURCE> <OUT>
-```
-
 ## RED4-Conflicts
+
+> Nexus Mods link: https://www.nexusmods.com/cyberpunk2077/mods/11126
 
 A conflict-checker app for Cyberpunk 2077 archives.
 
@@ -33,3 +26,12 @@ A small app to display various tweak-related info.
 
 ### Screenshots
 ![screenshot](./assets/Screenshot%202023-11-10%20173502.png)
+
+## Tweak-Doxygen
+
+A small rust utility to convert and strip tweak records (<https://github.com/CDPR-Modding-Documentation/Cyberpunk-Tweaks>) to a c# class hierarchy for use with doxygen: <https://cdpr-modding-documentation.github.io/Cyberpunk-Tweaks/>
+
+### Usage
+```cmd
+tweakdox <SOURCE> <OUT>
+```
