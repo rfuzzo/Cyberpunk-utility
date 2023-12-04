@@ -1,7 +1,8 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 use log::error;
-use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files, Archive};
+use red4lib::archive::Archive;
+use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::{collections::HashMap, path::PathBuf};
@@ -132,7 +133,7 @@ impl TemplateApp {
 
             if let Ok(archive) = Archive::from_file(file_path) {
                 // add custom filenames
-                for f in archive.file_names.iter() {
+                for f in archive.file_names.values() {
                     let key = fnv1a64_hash_string(f);
                     self.hashes.insert(key, f.to_string());
                 }

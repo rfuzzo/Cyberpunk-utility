@@ -9,8 +9,9 @@ fn main() -> eframe::Result<()> {
     let _ = simple_logging::log_to_file(format!("{}.log", CARGO_NAME), log::LevelFilter::Info);
 
     let native_options = eframe::NativeOptions {
-        initial_window_size: Some([400.0, 300.0].into()),
-        min_window_size: Some([300.0, 220.0].into()),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([400.0, 300.0])
+            .with_min_inner_size([300.0, 220.0]),
         ..Default::default()
     };
     eframe::run_native(

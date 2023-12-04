@@ -52,7 +52,7 @@ impl eframe::App for TemplateApp {
 
         // Menu bar
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            self.menu_bar_view(ui, _frame);
+            self.menu_bar_view(ui, ctx);
         });
 
         // Left panel
@@ -396,7 +396,7 @@ impl TemplateApp {
             });
     }
 
-    fn menu_bar_view(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn menu_bar_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         // The top panel is often a good place for a menu bar:
         egui::menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
@@ -406,7 +406,7 @@ impl TemplateApp {
                 }
                 ui.separator();
                 if ui.button("Quit").clicked() {
-                    _frame.close();
+                  ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
             ui.menu_button("About", |ui| {
