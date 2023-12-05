@@ -1668,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "red4lib"
 version = "0.1.1"
-source = "git+https://github.com/rfuzzo/red4lib#1954a11af6b7361c40d33d9b841583a30ae7e52b"
+source = "git+https://github.com/rfuzzo/red4lib#eb9817f5635cb8a1445ef06a5bdfeb7a23f588b8"
 dependencies = [
  "byteorder",
  "cmake",
@@ -2563,9 +2563,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.5.21"
+version = "0.5.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12b1ca33e6ddf286f444aca4f9e91152c681bf93c491687d43cd69bd5078fb4b"
+checksum = "0383266b19108dfc6314a56047aa545a1b4d1be60e799b4dbdd407b56402704b"
 dependencies = [
  "memchr",
 ]
