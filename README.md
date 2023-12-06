@@ -15,6 +15,27 @@ A conflict-checker app for Cyberpunk 2077 archives.
 ### Screenshots
 ![screenshot](./assets/red4_conflicts_02.png)
 
+## RED4-Update
+
+A commandline tool to check if a mod needs an update after a game patch
+
+### Usage
+- download and extract
+- run `red4-update.exe` and specify a folder with archives to check (or run it from within that folder)
+
+```cmd
+Usage: red4-update.exe check [PATH]
+
+Arguments:
+  [PATH]  Path to a folder with archives to check
+
+Options:
+  -h, --help  Print help
+```
+
+### Screenshots
+![screenshot](./assets/red4-update.png)
+
 ## Cyberpunk-Tweak Util
 A small app to display various tweak-related info.
 
