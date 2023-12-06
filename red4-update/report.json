@@ -1,0 +1,14 @@
+{
+  "test.archive": {
+    "deleted": {},
+    "added": {},
+    "changed": {
+      "11399646534807003211": {
+        "hash": 11399646534807003211,
+        "name": "base\\prefabs\\buildings\\megabuilding\\geo\\interior\\floors\\vs_apartment_floors\\vs_apartment_floor\\arch_floor_06_383094b6_mc.mesh",
+        "archive_name": "test.archive",
+        "sha1": "da39a3ee5e6b4bd3255bfef95601890afd879"
+      }
+    }
+  }
+}

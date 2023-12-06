@@ -20,7 +20,7 @@ jobs:
       matrix:
         os: [windows-latest]
         build_type: [release]
-        target: [tweak-doxygen, red4-tweak-browser, red4-conflicts]
+        target: [tweak-doxygen, red4-tweak-browser, red4-conflicts, "red4-update"]
 
     steps:
     - uses: actions/checkout@v3
