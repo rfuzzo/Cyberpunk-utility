@@ -25,29 +25,24 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # - name: Check
-    #   run: |
-    #     cd ${{ matrix.target }}
-    #     cargo check --all-features
-    # - name: Format
-    #   run: |
-    #     cd ${{ matrix.target }}
-    #     cargo fmt --all -- --check
-    # - name: Clippy
-    #   run: |
-    #     cd ${{ matrix.target }}
-    #     cargo clippy -- -D warnings
     - name: Build
       run: |
         cd ${{ matrix.target }}
         cargo build --${{ matrix.build_type }}
-    # - name: Run tests
-    #   run: |
-    #     cd ${{ matrix.target }}
-    #     cargo test
+    - name: Run tests
+      run: |
+        cd ${{ matrix.target }}
+        cargo test
     
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.target }}
         path: ${{ matrix.target }}/target/${{ matrix.build_type }}/${{ matrix.target }}.exe
+    
+    - name: Upload to release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "${{ matrix.target }}/target/${{ matrix.build_type }}/${{ matrix.target }}.exe"
+        allowUpdates: true
+        tag: "latest"
