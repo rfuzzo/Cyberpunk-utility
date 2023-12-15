@@ -43,12 +43,12 @@ impl eframe::App for TemplateApp {
                 self.serialize_load_order();
             }
         } else {
-            self.set_load_order();
+            // first load
+            self.reload_load_order();
             self.generate_conflict_map();
             self.last_load_order = Some(self.load_order.clone());
             self.serialize_load_order();
         }
-        self.set_load_order();
 
         // Menu bar
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -68,6 +68,7 @@ impl eframe::App for TemplateApp {
 }
 
 impl TemplateApp {
+    /// Side panel with a mod list in correct order
     fn load_order_view(&mut self, ui: &mut egui::Ui) {
         ui.heading("Load Order");
         ui.label("Drag to reorder, higher overrides");
@@ -123,14 +124,16 @@ impl TemplateApp {
         });
     }
 
+    /// Main conflict grid
     fn conflicts_view(&mut self, ui: &mut egui::Ui) {
         ui.heading("Conflicts");
         ui.separator();
         // -------------------
         ui.horizontal(|ui| {
             ui.label("Archives path");
-            let mut path_str = self.game_path.to_str().unwrap();
-            ui.text_edit_singleline(&mut path_str);
+            if let Some(mut path_str) = self.game_path.to_str() {
+                ui.text_edit_singleline(&mut path_str);
+            }
             if ui.button("...").clicked() {
                 // open file
                 if let Some(folder) = rfd::FileDialog::new().set_directory("/").pick_folder() {
@@ -141,7 +144,9 @@ impl TemplateApp {
             }
             // generate conflict map
             if ui.button("⟳  Re-check conflicts").clicked() && self.game_path.exists() {
+                self.reload_load_order();
                 self.generate_conflict_map();
+                self.last_load_order = Some(self.load_order.clone());
             }
         });
         ui.separator();
@@ -205,18 +210,9 @@ impl TemplateApp {
                                 continue;
                             }
 
-                            let filename = value
-                                .path
-                                .file_name()
-                                .unwrap()
-                                .to_ascii_lowercase()
-                                .to_str()
-                                .unwrap()
-                                .to_owned();
-
                             // text filter
                             if !self.text_filter.is_empty()
-                                && !filename
+                                && !value.file_name
                                     .to_lowercase()
                                     .contains(&self.text_filter.to_lowercase())
                             {
@@ -226,14 +222,14 @@ impl TemplateApp {
                             let filename_ext = if !self.show_no_conflicts {
                                 format!(
                                     "{} (w: {}, l: {})",
-                                    filename,
+                                    value.file_name,
                                     value.wins.len(),
                                     value.loses.len()
                                 )
                             } else {
                                 format!(
                                     "{} (w: {}, l: {}, u: {})",
-                                    filename,
+                                    value.file_name,
                                     value.wins.len(),
                                     value.loses.len(),
                                     value.get_no_conflicts().len()
@@ -390,12 +386,14 @@ impl TemplateApp {
                             });
 
                             ui.end_row();
+                                                        
                         }
                     }
                 });
             });
     }
 
+    /// The menu bar
     fn menu_bar_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         // The top panel is often a good place for a menu bar:
         egui::menu::bar(ui, |ui| {
@@ -431,6 +429,7 @@ impl TemplateApp {
         });
     }
 
+    /// Dark/light mode switch
     fn global_dark_light_mode_buttons(&mut self, ui: &mut egui::Ui) {
         let mut visuals = ui.ctx().style().visuals.clone();
         visuals.light_dark_radio_buttons(ui);
@@ -460,15 +459,11 @@ fn show_inline(
                     continue;
                 }
 
-                let mut archive_name = archive_hash.to_string();
-                if let Some(archive_vm) = archive_map.get(archive_hash) {
-                    archive_name = archive_vm
-                        .path
-                        .file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
+                let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_vm.file_name.to_owned()
+                } else {
+                    archive_hash.to_string()
+                };
                 ui.label(archive_name);
             }
         }
@@ -492,16 +487,12 @@ fn show_tooltip(
                 if archive_hash == k {
                     continue;
                 }
-
-                let mut archive_name = archive_hash.to_string();
-                if let Some(archive_vm) = archive_map.get(archive_hash) {
-                    archive_name = archive_vm
-                        .path
-                        .file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
+                 
+                let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_vm.file_name.to_owned()
+                } else {
+                    archive_hash.to_string()
+                };
                 ui.label(archive_name);
             }
         }
@@ -525,15 +516,11 @@ fn show_dropdown_filelist(
                     continue;
                 }
 
-                let mut archive_name = archive_hash.to_string();
-                if let Some(archive_vm) = archive_map.get(archive_hash) {
-                    archive_name = archive_vm
-                        .path
-                        .file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
+                let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
+                    archive_vm.file_name.to_owned()
+                } else {
+                    archive_hash.to_string()
+                };
                 ui.separator();
                 ui.label(archive_name);
             }

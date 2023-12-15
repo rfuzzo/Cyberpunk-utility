@@ -12,8 +12,9 @@ mod app;
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 
+#[derive(Clone)]
 struct ArchiveViewModel {
-    pub path: PathBuf,
+    pub file_name: String,
     /// winning file hashes
     pub wins: Vec<u64>,
     /// losing file hashes
@@ -35,10 +36,11 @@ impl ArchiveViewModel {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
+#[derive(Default, serde::Deserialize, serde::Serialize, Debug, PartialEq)]
 enum ETooltipVisuals {
     Tooltip,
     Inline,
+    #[default]
     Collapsing,
 }
 
@@ -49,14 +51,17 @@ enum ETheme {
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     game_path: PathBuf,
     // UI
     show_no_conflicts: bool,
+    /// the way conflicts are disaplyed in the conflicts view
     tooltips_visuals: ETooltipVisuals,
+    /// the app's theme
     theme: Option<ETheme>,
+    /// enables load order management via modlist.txt
     enable_modlist: bool,
 
     /// hash DB
@@ -68,37 +73,17 @@ pub struct TemplateApp {
     /// map of file hashes to archive hashes
     #[serde(skip)]
     conflicts: HashMap<u64, Vec<u64>>,
-
     /// archive hash load order
     #[serde(skip)]
     load_order: Vec<String>,
     #[serde(skip)]
     last_load_order: Option<Vec<String>>,
 
-    // UI
+    // UI filters
     #[serde(skip)]
     text_filter: String,
     #[serde(skip)]
     file_filter: String,
-}
-
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            theme: None,
-            hashes: HashMap::default(),
-            game_path: PathBuf::from(""),
-            archives: HashMap::default(),
-            conflicts: HashMap::default(),
-            load_order: vec![],
-            last_load_order: None,
-            text_filter: "".into(),
-            file_filter: "".into(),
-            show_no_conflicts: false,
-            enable_modlist: false,
-            tooltips_visuals: ETooltipVisuals::Collapsing,
-        }
-    }
 }
 
 impl TemplateApp {
@@ -118,47 +103,63 @@ impl TemplateApp {
 
     /// Returns the conflict map of this [`TemplateApp`]. Also sets archive and conflict maps
     fn generate_conflict_map(&mut self) {
+        let old_archives = self.archives.clone();
         self.archives.clear();
         self.conflicts.clear();
 
         let mut conflict_map: HashMap<u64, Vec<u64>> = HashMap::default();
-        //let mut temp_load_order: Vec<PathBuf> = vec![];
 
         // scan
         let mut mods = self.load_order.clone();
         mods.reverse();
+
         for archive_name in mods.iter() {
             let file_path = &self.game_path.join(archive_name);
+            let archive_hash = fnv1a64_hash_path(file_path);
             log::info!("parsing {}", file_path.display());
 
-            if let Ok(archive) = Archive::from_file(file_path) {
+            // read or get the archive
+            let mut archive_or_none: Option<ArchiveViewModel> = None;
+            if let Some(archive) = old_archives.get(&archive_hash) {
+                // no need to read the file again
+                let mut empty_vm = archive.clone();
+                // but clean it since we're calculating conflicts anew
+                empty_vm.wins.clear();
+                empty_vm.loses.clear();
+
+                archive_or_none = Some(empty_vm);
+            } else if let Ok(archive) = Archive::from_file(file_path) {
                 // add custom filenames
                 for f in archive.file_names.values() {
                     let key = fnv1a64_hash_string(f);
                     self.hashes.insert(key, f.to_string());
                 }
 
-                // conflicts
-                let mut hashes = archive.get_file_hashes();
-                hashes.sort();
-                let archive_hash = fnv1a64_hash_path(file_path);
-                //temp_load_order.push(file_path.to_owned());
+                if let Some(file_name) = file_path.file_name().and_then(|f| f.to_str()) {
+                    // conflicts
+                    let mut hashes = archive.get_file_hashes();
+                    hashes.sort();
 
-                let mut vm = ArchiveViewModel {
-                    path: file_path.to_owned(),
-                    hashes: hashes.clone(),
-                    wins: vec![],
-                    loses: vec![],
-                };
+                    let vm = ArchiveViewModel {
+                        file_name: file_name.to_owned(),
+                        hashes: hashes.clone(),
+                        wins: vec![],
+                        loses: vec![],
+                    };
 
-                for hash in hashes {
-                    if let Some(archive_names) = conflict_map.get_mut(&hash) {
+                    archive_or_none = Some(vm);
+                }
+            }
+
+            if let Some(mut archive_vm) = archive_or_none {
+                for hash in &archive_vm.hashes {
+                    if let Some(archive_names) = conflict_map.get_mut(hash) {
                         // found a conflict
                         // update vms
                         // add this file to all previous archive's losing files
                         for archive in archive_names.iter() {
-                            if !self.archives.get(archive).unwrap().loses.contains(&hash) {
-                                self.archives.get_mut(archive).unwrap().loses.push(hash);
+                            if !self.archives.get(archive).unwrap().loses.contains(hash) {
+                                self.archives.get_mut(archive).unwrap().loses.push(*hash);
                             }
                         }
                         // add the current archive to the list of conflicting archives last
@@ -166,16 +167,16 @@ impl TemplateApp {
                             archive_names.push(archive_hash);
                         }
                         // add this file to this mods winning files
-                        if !vm.wins.contains(&hash) {
-                            vm.wins.push(hash);
+                        if !archive_vm.wins.contains(hash) {
+                            archive_vm.wins.push(*hash);
                         }
                     } else {
                         // first occurance
-                        conflict_map.insert(hash, vec![archive_hash]);
+                        conflict_map.insert(*hash, vec![archive_hash]);
                     }
                 }
 
-                self.archives.insert(archive_hash, vm);
+                self.archives.insert(archive_hash, archive_vm);
             }
         }
 
@@ -210,7 +211,7 @@ impl TemplateApp {
     }
 
     /// Clear and regenerate load order
-    pub fn set_load_order(&mut self) {
+    pub fn reload_load_order(&mut self) {
         self.load_order.clear();
 
         let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
