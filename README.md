@@ -1,3 +1,5 @@
+[![Rust](https://github.com/rfuzzo/Cyberpunk-utility/actions/workflows/rust.yml/badge.svg)](https://github.com/rfuzzo/Cyberpunk-utility/actions/workflows/rust.yml)
+
 # Cyberpunk-utility
 
 Some utility tools for Cyberpunk 2077 modding.
