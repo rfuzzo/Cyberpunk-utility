@@ -253,7 +253,8 @@ impl TemplateApp {
         let modlist_name = "modlist.txt";
         if let Ok(mut file) = std::fs::File::create(self.game_path.join(modlist_name)) {
             for line in &self.load_order {
-                match writeln!(file, "{}", line) {
+                let new_line = format!("{}\r\n", line);
+                match file.write(new_line.as_bytes()) {
                     Ok(_) => {}
                     Err(err) => {
                         error!("failed to write line {}", err);
