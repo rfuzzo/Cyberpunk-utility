@@ -1656,7 +1656,7 @@ checksum = "42a9830a0e1b9fb145ebb365b8bc4ccd75f290f98c0247deafbbe2c75cefb544"
 
 [[package]]
 name = "red4-conflicts"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "eframe",
  "egui",

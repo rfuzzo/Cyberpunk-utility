@@ -283,7 +283,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        true
                                                     );
                                                 }
                                                 crate::ETooltipVisuals::Collapsing => {
@@ -347,7 +347,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        false
                                                     );
                                                 }
                                                 crate::ETooltipVisuals::Collapsing => {
@@ -448,17 +448,43 @@ fn show_inline(
     k: &u64,
     conflicts: &HashMap<u64, Vec<u64>>,
     archive_map: &HashMap<u64, ArchiveViewModel>,
-    color: Color32,
+    winning: bool
 ) {
     ui.horizontal(|ui| {
+        let color = if winning {
+            Color32::GREEN
+        } else {
+            Color32::RED
+        };
         ui.colored_label(color, label_text);
         // get archive names
         if let Some(archives) = conflicts.get(h) {
+
+            let mut stop_skip = false;
+            let mut final_names = vec![];    
+
+            let archives = if winning {
+                archives.iter().rev().collect::<Vec<_>>()
+            } else {
+                archives.iter().collect::<Vec<_>>()
+            };
+
             for archive_hash in archives {
                 if archive_hash == k {
+                    stop_skip = true;
                     continue;
                 }
 
+                if stop_skip {
+                    final_names.push(archive_hash);
+                }
+            }
+
+            if !winning {
+                final_names.reverse();
+            }
+
+            for archive_hash in final_names {
                 let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
                     archive_vm.file_name.to_owned()
                 } else {
@@ -466,6 +492,7 @@ fn show_inline(
                 };
                 ui.label(archive_name);
             }
+
         }
     });
 }
