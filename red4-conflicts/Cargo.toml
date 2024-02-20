@@ -11,7 +11,7 @@ eframe = { version = "0.26", default-features = false, features = [
   "persistence",   # Enable restoring app state when restarting the app.
 ] }
 log = "0.4"
-rfd = "0.13"
+rfd = "0.14"
 serde = { version = "1", features = ["derive"] }
 simple-logging = "2.0"
 open = "5.0"

@@ -148,6 +148,9 @@ impl TemplateApp {
                 self.generate_conflict_map();
                 self.last_load_order = Some(self.load_order.clone());
             }
+            if ui.button("🗁 Open in Explorer").clicked() && self.game_path.exists() {
+                let _ = open::that(self.game_path.clone());
+            }
         });
         ui.separator();
         // -------------------
@@ -235,7 +238,7 @@ impl TemplateApp {
                                     value.get_no_conflicts().len()
                                 )
                             };
-
+                            
                             ui.collapsing(filename_ext, |ui| {
                                 let mut header_color = if value.wins.is_empty() {
                                     ui.visuals().text_color()
@@ -262,7 +265,6 @@ impl TemplateApp {
                                                 continue;
                                             }
 
-                                            let color = Color32::GREEN;
                                             match self.tooltips_visuals {
                                                 crate::ETooltipVisuals::Tooltip => {
                                                     show_tooltip(
@@ -272,7 +274,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        true,
                                                     );
                                                 }
                                                 crate::ETooltipVisuals::Inline => {
@@ -294,7 +296,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        true,
                                                     );
                                                 }
                                             }
@@ -326,7 +328,6 @@ impl TemplateApp {
                                                 continue;
                                             }
 
-                                            let color = Color32::RED;
                                             match self.tooltips_visuals {
                                                 crate::ETooltipVisuals::Tooltip => {
                                                     show_tooltip(
@@ -336,7 +337,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        false,
                                                     );
                                                 }
                                                 crate::ETooltipVisuals::Inline => {
@@ -358,7 +359,7 @@ impl TemplateApp {
                                                         k,
                                                         &self.conflicts,
                                                         &self.archives,
-                                                        color,
+                                                        false,
                                                     );
                                                 }
                                             }
@@ -441,11 +442,38 @@ impl TemplateApp {
     }
 }
 
+fn get_archive_hashes_for_ui(winning: bool, archives: &[u64], key: &u64) -> Vec<u64> {
+    let mut stop_skip = false;
+    let mut final_names = vec![];
+
+    let archives = if winning {
+        archives.iter().rev().collect::<Vec<_>>()
+    } else {
+        archives.iter().collect::<Vec<_>>()
+    };
+
+    for archive_hash in archives {
+        if archive_hash == key {
+            stop_skip = true;
+            continue;
+        }
+
+        if stop_skip {
+            final_names.push(*archive_hash);
+        }
+    }
+
+    if !winning {
+        final_names.reverse();
+    }
+    final_names
+}
+
 fn show_inline(
     ui: &mut egui::Ui,
     label_text: String,
     h: &u64,
-    k: &u64,
+    key: &u64,
     conflicts: &HashMap<u64, Vec<u64>>,
     archive_map: &HashMap<u64, ArchiveViewModel>,
     winning: bool
@@ -459,33 +487,8 @@ fn show_inline(
         ui.colored_label(color, label_text);
         // get archive names
         if let Some(archives) = conflicts.get(h) {
-
-            let mut stop_skip = false;
-            let mut final_names = vec![];    
-
-            let archives = if winning {
-                archives.iter().rev().collect::<Vec<_>>()
-            } else {
-                archives.iter().collect::<Vec<_>>()
-            };
-
-            for archive_hash in archives {
-                if archive_hash == k {
-                    stop_skip = true;
-                    continue;
-                }
-
-                if stop_skip {
-                    final_names.push(archive_hash);
-                }
-            }
-
-            if !winning {
-                final_names.reverse();
-            }
-
-            for archive_hash in final_names {
-                let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
+            for archive_hash in get_archive_hashes_for_ui(winning, archives, key) {
+                let archive_name = if let Some(archive_vm) = archive_map.get(&archive_hash) {
                     archive_vm.file_name.to_owned()
                 } else {
                     archive_hash.to_string()
@@ -497,25 +500,29 @@ fn show_inline(
     });
 }
 
+
+
 fn show_tooltip(
     ui: &mut egui::Ui,
     label_text: String,
     h: &u64,
-    k: &u64,
+    key: &u64,
     conflicts: &HashMap<u64, Vec<u64>>,
     archive_map: &HashMap<u64, ArchiveViewModel>,
-    color: Color32,
+    winning: bool
 ) {
+    let color = if winning {
+        Color32::GREEN
+    } else {
+        Color32::RED
+    };
     let r = ui.colored_label(color, label_text);
     r.on_hover_ui(|ui| {
         // get archive names
         if let Some(archives) = conflicts.get(h) {
-            for archive_hash in archives {
-                if archive_hash == k {
-                    continue;
-                }
-                 
-                let archive_name = if let Some(archive_vm) = archive_map.get(archive_hash) {
+            for archive_hash in get_archive_hashes_for_ui(winning, archives, key) {
+               
+                let archive_name = if let Some(archive_vm) = archive_map.get(&archive_hash) {
                     archive_vm.file_name.to_owned()
                 } else {
                     archive_hash.to_string()
@@ -530,16 +537,21 @@ fn show_dropdown_filelist(
     ui: &mut egui::Ui,
     label_text: String,
     h: &u64,
-    k: &u64,
+    key: &u64,
     conflicts: &HashMap<u64, Vec<u64>>,
     archive_map: &HashMap<u64, ArchiveViewModel>,
-    color: Color32,
+    winning: bool
 ) {
+    let color = if winning {
+        Color32::GREEN
+    } else {
+        Color32::RED
+    };
     ui.collapsing(egui::RichText::new(label_text).color(color), |ui| {
         // get archive names
         if let Some(archives) = conflicts.get(h) {
             for archive_hash in archives {
-                if archive_hash == k {
+                if archive_hash == key {
                     continue;
                 }
 
@@ -548,7 +560,7 @@ fn show_dropdown_filelist(
                 } else {
                     archive_hash.to_string()
                 };
-                ui.separator();
+                //ui.separator();
                 ui.label(archive_name);
             }
         }
