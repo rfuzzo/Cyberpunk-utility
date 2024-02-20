@@ -203,19 +203,19 @@ impl TemplateApp {
         egui::ScrollArea::both()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
-                egui::Grid::new("mod_list").num_columns(1).show(ui, |ui| {
+                egui::Grid::new("mod_list").num_columns(2).show(ui, |ui| {
                     for archive_name in &self.load_order {
                         let archive_path = &self.game_path.join(archive_name);
                         let k = &fnv1a64_hash_path(archive_path);
-                        if let Some(value) = self.archives.get(k) {
+                        if let Some(mod_vm) = self.archives.get(k) {
                             // skip if no conflicts
-                            if value.loses.len() + value.wins.len() == 0 {
+                            if mod_vm.loses.len() + mod_vm.wins.len() == 0 {
                                 continue;
                             }
 
                             // text filter
                             if !self.text_filter.is_empty()
-                                && !value.file_name
+                                && !mod_vm.file_name
                                     .to_lowercase()
                                     .contains(&self.text_filter.to_lowercase())
                             {
@@ -225,31 +225,32 @@ impl TemplateApp {
                             let filename_ext = if !self.show_no_conflicts {
                                 format!(
                                     "{} (w: {}, l: {})",
-                                    value.file_name,
-                                    value.wins.len(),
-                                    value.loses.len()
+                                    mod_vm.file_name,
+                                    mod_vm.wins.len(),
+                                    mod_vm.loses.len()
                                 )
                             } else {
                                 format!(
                                     "{} (w: {}, l: {}, u: {})",
-                                    value.file_name,
-                                    value.wins.len(),
-                                    value.loses.len(),
-                                    value.get_no_conflicts().len()
+                                    mod_vm.file_name,
+                                    mod_vm.wins.len(),
+                                    mod_vm.loses.len(),
+                                    mod_vm.get_no_conflicts().len()
                                 )
                             };
-                            
+
+                            // column 1
                             ui.collapsing(filename_ext, |ui| {
-                                let mut header_color = if value.wins.is_empty() {
+                                let mut header_color = if mod_vm.wins.is_empty() {
                                     ui.visuals().text_color()
                                 } else {
                                     Color32::GREEN
                                 };
                                 ui.collapsing(
-                                    egui::RichText::new(format!("winning ({})", value.wins.len()))
+                                    egui::RichText::new(format!("winning ({})", mod_vm.wins.len()))
                                         .color(header_color),
                                     |ui| {
-                                        for h in &value.wins {
+                                        for h in &mod_vm.wins {
                                             // resolve hash
                                             let mut label_text = h.to_string();
                                             if let Some(file_name) = self.hashes.get(h) {
@@ -304,16 +305,16 @@ impl TemplateApp {
                                     },
                                 );
 
-                                header_color = if value.loses.is_empty() {
+                                header_color = if mod_vm.loses.is_empty() {
                                     ui.visuals().text_color()
                                 } else {
                                     Color32::RED
                                 };
                                 ui.collapsing(
-                                    egui::RichText::new(format!("losing ({})", value.loses.len()))
+                                    egui::RichText::new(format!("losing ({})", mod_vm.loses.len()))
                                         .color(header_color),
                                     |ui| {
-                                        for h in &value.loses {
+                                        for h in &mod_vm.loses {
                                             let mut label_text = h.to_string();
                                             if let Some(file_name) = self.hashes.get(h) {
                                                 label_text = file_name.to_owned();
@@ -371,21 +372,40 @@ impl TemplateApp {
                                     ui.collapsing(
                                         format!(
                                             "no conflicts ({})",
-                                            value.get_no_conflicts().len()
+                                            mod_vm.get_no_conflicts().len()
                                         ),
                                         |ui| {
-                                            for h in &value.get_no_conflicts() {
+                                            for h in &mod_vm.get_no_conflicts() {
                                                 let mut label_text = h.to_string();
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
                                                 }
-                                                ui.label(label_text);
+                                                ui.add(egui::Label::new(label_text).wrap(false));
                                             }
                                         },
                                     );
                                 }
                             });
 
+                            // column 2
+                            ui.horizontal_top(|ui|
+                            {
+                                // if all files of a mod are losing then its obsolete
+                                if (mod_vm.files.len() == mod_vm.loses.len()) && mod_vm.wins.is_empty() {
+                                    ui.colored_label( Color32::GRAY, "⏺");
+                                }
+                                else {
+                                     // if some files are winning add green dot
+                                    if !mod_vm.wins.is_empty() {
+                                        ui.colored_label( Color32::GREEN, "⏺");
+                                    }
+                                    // if some files are losing add red dot
+                                    if !mod_vm.loses.is_empty() {
+                                        ui.colored_label( Color32::RED, "⏺");
+                                    }
+                                }
+                            });
+                            
                             ui.end_row();
                                                         
                         }

@@ -20,13 +20,13 @@ struct ArchiveViewModel {
     /// losing file hashes
     pub loses: Vec<u64>,
     /// all file hashes
-    pub hashes: Vec<u64>,
+    pub files: Vec<u64>,
 }
 
 impl ArchiveViewModel {
     pub fn get_no_conflicts(&self) -> Vec<u64> {
         let result: Vec<u64> = self
-            .hashes
+            .files
             .iter()
             .filter(|&x| !self.wins.contains(x))
             .filter(|&x| !self.loses.contains(x))
@@ -142,7 +142,7 @@ impl TemplateApp {
 
                     let vm = ArchiveViewModel {
                         file_name: file_name.to_owned(),
-                        hashes: hashes.clone(),
+                        files: hashes.clone(),
                         wins: vec![],
                         loses: vec![],
                     };
@@ -152,7 +152,7 @@ impl TemplateApp {
             }
 
             if let Some(mut archive_vm) = archive_or_none {
-                for hash in &archive_vm.hashes {
+                for hash in &archive_vm.files {
                     if let Some(archive_names) = conflict_map.get_mut(hash) {
                         // found a conflict
                         // update vms
