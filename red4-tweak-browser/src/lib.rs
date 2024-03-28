@@ -183,7 +183,7 @@ pub fn get_records(path: &PathBuf) -> Vec<TweakRecord> {
 
         if let Ok(lines) = read_lines(entry.path()) {
             parsed += 1;
-            for line in lines.flatten() {
+            for line in lines.map_while(Result::ok) {
                 if line.starts_with("package ") {
                     package = line["package".len() + 1..].to_string();
 
