@@ -174,15 +174,16 @@ impl TemplateApp {
                     }
                     ui.separator();
                     if ui.button("Quit").clicked() {
-                        _frame.close();
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
-                ui.add_space(16.0);
 
-                egui::widgets::global_dark_light_mode_buttons(ui);
-                ui.add_space(16.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    egui::global_theme_preference_buttons(ui);
+                    ui.add_space(16.0);
 
-                ui.label(format!("v{}", VERSION));
+                    ui.label(format!("v{}", VERSION));
+                });
             });
         });
     }
@@ -215,8 +216,8 @@ impl TemplateApp {
                     }
                     // package filter
                     ui.separator();
-                    egui::ComboBox::from_id_source("cb_package")
-                        .wrap(false)
+                    egui::ComboBox::from_id_salt("cb_package")
+                        .wrap_mode(egui::TextWrapMode::Truncate)
                         .selected_text(format!("{:?}", &mut self.filter_package))
                         .show_ui(ui, |ui| {
                             for p in &self.filtered_packages {

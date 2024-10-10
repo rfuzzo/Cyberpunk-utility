@@ -1,10 +1,10 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 use log::error;
-use red4lib::archive::Archive;
-use red4lib::{fnv1a64_hash_path, fnv1a64_hash_string, get_files};
-use std::fs::File;
+use red4lib::fnv1a64_hash_path;
+use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
+use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
 
 mod app;
@@ -44,12 +44,6 @@ enum ETooltipVisuals {
     Collapsing,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
-enum ETheme {
-    Dark,
-    Light,
-}
-
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -59,8 +53,7 @@ pub struct TemplateApp {
     show_no_conflicts: bool,
     /// the way conflicts are disaplyed in the conflicts view
     tooltips_visuals: ETooltipVisuals,
-    /// the app's theme
-    theme: Option<ETheme>,
+
     /// enables load order management via modlist.txt
     enable_modlist: bool,
 
@@ -114,9 +107,9 @@ impl TemplateApp {
         mods.reverse();
 
         for archive_name in mods.iter() {
-            let file_path = &self.game_path.join(archive_name);
-            let archive_hash = fnv1a64_hash_path(file_path);
-            log::info!("parsing {}", file_path.display());
+            let archive_file_path = &self.game_path.join(archive_name);
+            let archive_hash = fnv1a64_hash_path(archive_file_path);
+            log::info!("parsing {}", archive_file_path.display());
 
             // read or get the archive
             let mut archive_or_none: Option<ArchiveViewModel> = None;
@@ -128,20 +121,20 @@ impl TemplateApp {
                 empty_vm.loses.clear();
 
                 archive_or_none = Some(empty_vm);
-            } else if let Ok(archive) = Archive::from_file(file_path) {
-                // add custom filenames
-                for f in archive.file_names.values() {
-                    let key = fnv1a64_hash_string(f);
-                    self.hashes.insert(key, f.to_string());
-                }
-
-                if let Some(file_name) = file_path.file_name().and_then(|f| f.to_str()) {
+            } else if let Ok(archive) = red4lib::archive::open_read(archive_file_path) {
+                if let Some(archive_file_name) =
+                    archive_file_path.file_name().and_then(|f| f.to_str())
+                {
                     // conflicts
-                    let mut hashes = archive.get_file_hashes();
+                    let mut hashes = archive
+                        .get_entries()
+                        .clone()
+                        .into_keys()
+                        .collect::<Vec<_>>();
                     hashes.sort();
 
                     let vm = ArchiveViewModel {
-                        file_name: file_name.to_owned(),
+                        file_name: archive_file_name.to_owned(),
                         files: hashes.clone(),
                         wins: vec![],
                         loses: vec![],
@@ -191,25 +184,6 @@ impl TemplateApp {
         self.conflicts = conflicts;
     }
 
-    fn read_file_to_vec(file_path: &PathBuf) -> io::Result<Vec<String>> {
-        let file = File::open(file_path)?;
-        let reader = BufReader::new(file);
-
-        let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
-
-        Ok(lines)
-    }
-
-    fn pathbuf_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
-        paths
-            .into_iter()
-            .filter_map(|path| {
-                path.file_name()
-                    .map(|filename| filename.to_string_lossy().into_owned())
-            })
-            .collect()
-    }
-
     /// Clear and regenerate load order
     pub fn reload_load_order(&mut self) {
         self.load_order.clear();
@@ -224,7 +198,7 @@ impl TemplateApp {
         // load according to modlist.txt
         let mut final_order: Vec<PathBuf> = vec![];
         let modlist_name = "modlist.txt";
-        if let Ok(lines) = Self::read_file_to_vec(&self.game_path.join(modlist_name)) {
+        if let Ok(lines) = read_file_to_vec(&self.game_path.join(modlist_name)) {
             for name in lines {
                 let file_name = self.game_path.join(name);
                 if mods.contains(&file_name) {
@@ -242,7 +216,7 @@ impl TemplateApp {
         }
         // TODO Redmods
 
-        self.load_order = Self::pathbuf_to_string_vec(final_order);
+        self.load_order = pathbuf_to_string_vec(final_order);
     }
 
     fn serialize_load_order(&self) {
@@ -254,7 +228,7 @@ impl TemplateApp {
         if let Ok(mut file) = std::fs::File::create(self.game_path.join(modlist_name)) {
             for line in &self.load_order {
                 let new_line = format!("{}\r\n", line);
-                match file.write(new_line.as_bytes()) {
+                match file.write_all(new_line.as_bytes()) {
                     Ok(_) => {}
                     Err(err) => {
                         error!("failed to write line {}", err);
@@ -265,4 +239,47 @@ impl TemplateApp {
             error!("failed to write load order");
         }
     }
+}
+
+fn read_file_to_vec(file_path: &PathBuf) -> io::Result<Vec<String>> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+
+    let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
+
+    Ok(lines)
+}
+
+fn pathbuf_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            path.file_name()
+                .map(|filename| filename.to_string_lossy().into_owned())
+        })
+        .collect()
+}
+
+/// Get top-level files of a folder with given extension
+fn get_files(folder_path: &Path, extension: &str) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if !folder_path.exists() {
+        return files;
+    }
+
+    if let Ok(entries) = fs::read_dir(folder_path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    if let Some(ext) = entry.path().extension() {
+                        if ext == extension {
+                            files.push(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    files
 }

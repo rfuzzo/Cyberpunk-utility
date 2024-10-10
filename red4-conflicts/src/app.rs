@@ -3,7 +3,7 @@ use std::{collections::HashMap, env};
 use egui::Color32;
 use red4lib::{fnv1a64_hash_path, get_red4_hashes};
 
-use crate::{ArchiveViewModel, ETheme, ETooltipVisuals, TemplateApp};
+use crate::{ArchiveViewModel, ETooltipVisuals, TemplateApp};
 
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
@@ -21,15 +21,6 @@ impl eframe::App for TemplateApp {
         if !self.game_path.exists() {
             if let Ok(current_dir) = env::current_dir() {
                 self.game_path = current_dir;
-            }
-        }
-        // set dark mode by default
-        if self.theme.is_none() {
-            ctx.set_visuals(egui::Visuals::dark())
-        } else if let Some(theme) = &self.theme {
-            match theme {
-                crate::ETheme::Dark => ctx.set_visuals(egui::Visuals::dark()),
-                crate::ETheme::Light => ctx.set_visuals(egui::Visuals::light()),
             }
         }
 
@@ -64,6 +55,8 @@ impl eframe::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.conflicts_view(ui);
         });
+
+       
     }
 }
 
@@ -81,7 +74,8 @@ impl TemplateApp {
             }
             // open info
             let below = egui::AboveOrBelow::Below;
-            egui::popup::popup_above_or_below_widget(ui, popup_id, &response, below, |ui| {
+            let close_on_click_outside = egui::popup::PopupCloseBehavior::CloseOnClickOutside;
+            egui::popup::popup_above_or_below_widget(ui, popup_id, &response, below, close_on_click_outside, |ui| {
                 ui.set_min_width(400.0); // if you want to control the size
                 ui.heading("Cyberpunk 2077 load order");
                 ui.label("Archives in Cyberpunk are loaded binary-alphabetically.");
@@ -158,7 +152,7 @@ impl TemplateApp {
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.show_no_conflicts, "Show not conflicting files");
             ui.label("Conflict style");
-            egui::ComboBox::from_id_source("tooltips_visuals")
+            egui::ComboBox::from_id_salt("tooltips_visuals")
                 .selected_text(format!("{:?}", &mut self.tooltips_visuals))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
@@ -380,7 +374,7 @@ impl TemplateApp {
                                                 if let Some(file_name) = self.hashes.get(h) {
                                                     label_text = file_name.to_owned();
                                                 }
-                                                ui.add(egui::Label::new(label_text).wrap(false));
+                                                ui.add(egui::Label::new(label_text).wrap_mode(egui::TextWrapMode::Truncate));
                                             }
                                         },
                                     );
@@ -440,9 +434,10 @@ impl TemplateApp {
             ui.add_space(16.0);
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.global_dark_light_mode_buttons(ui);
-                ui.label("Theme: ");
+                egui::global_theme_preference_buttons(ui);
+                
                 ui.add_space(16.0);
+                
                 ui.separator();
                 egui::warn_if_debug_build(ui);
                 ui.label(format!("v{}", crate::CARGO_PKG_VERSION));
@@ -450,16 +445,7 @@ impl TemplateApp {
         });
     }
 
-    /// Dark/light mode switch
-    fn global_dark_light_mode_buttons(&mut self, ui: &mut egui::Ui) {
-        let mut visuals = ui.ctx().style().visuals.clone();
-        visuals.light_dark_radio_buttons(ui);
-        ui.ctx().set_visuals(visuals);
-        match ui.ctx().style().visuals.clone().dark_mode {
-            true => self.theme = Some(ETheme::Dark),
-            false => self.theme = Some(ETheme::Light),
-        }
-    }
+   
 }
 
 fn get_archive_hashes_for_ui(winning: bool, archives: &[u64], key: &u64) -> Vec<u64> {

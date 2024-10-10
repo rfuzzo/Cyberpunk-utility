@@ -1,6 +1,8 @@
-use std::{collections::HashMap, path::Path};
-
-use red4lib::{archive::Archive, get_files};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Diff {
@@ -15,6 +17,30 @@ pub struct FileInfo {
     pub name: String,
     pub archive_name: String,
     pub sha1: String,
+}
+
+/// Get top-level files of a folder with given extension
+fn get_files(folder_path: &Path, extension: &str) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if !folder_path.exists() {
+        return files;
+    }
+
+    if let Ok(entries) = fs::read_dir(folder_path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    if let Some(ext) = entry.path().extension() {
+                        if ext == extension {
+                            files.push(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    files
 }
 
 pub fn get_info(
@@ -32,7 +58,7 @@ pub fn get_info(
     });
     for path in files_content {
         log::info!("Parsing {}", &path.display());
-        if let Ok(archive) = Archive::from_file(path) {
+        if let Ok(archive) = red4lib::archive::open_read(path) {
             let archive_name = path
                 .file_name()
                 .unwrap()
@@ -41,31 +67,24 @@ pub fn get_info(
                 .unwrap()
                 .to_owned();
 
-            let archive_files = archive
-                .index
-                .file_entries
-                .iter()
-                .map(|f| {
-                    let hash = *f.0;
-                    let mut sha = "".to_owned();
-                    for d in f.1.sha1_hash {
-                        sha += format!("{:x}", d).as_str();
-                    }
-                    (hash, sha)
-                })
-                .collect::<Vec<_>>();
-            for (hash, sha1) in archive_files {
+            for (hash, entry) in archive.get_entries() {
                 let mut name = hash.to_string();
-                if let Some(resolved_name) = hash_map.get(&hash) {
+                if let Some(resolved_name) = hash_map.get(hash) {
                     name = resolved_name.to_owned();
                 }
+
+                let mut sha = "".to_owned();
+                for d in entry.entry.sha1_hash() {
+                    sha += format!("{:x}", d).as_str();
+                }
+
                 let entry = FileInfo {
-                    hash,
+                    hash: *hash,
                     name,
                     archive_name: archive_name.to_owned(),
-                    sha1,
+                    sha1: sha,
                 };
-                file_map.insert(hash, entry);
+                file_map.insert(*hash, entry);
             }
         }
     }

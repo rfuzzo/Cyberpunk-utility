@@ -23,6 +23,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Red4 Conflict Checker",
         native_options,
-        Box::new(|cc| Box::new(red4_conflicts::TemplateApp::new(cc))),
+        Box::new(|cc| Ok(Box::new(red4_conflicts::TemplateApp::new(cc)))),
     )
 }
