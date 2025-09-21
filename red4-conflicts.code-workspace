@@ -4,5 +4,8 @@
 			"path": "red4-conflicts"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"editor.formatOnSave": true,
+		"files.autoSave": "afterDelay"
+	}
 }

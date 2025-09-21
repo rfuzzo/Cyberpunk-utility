@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env};
 
-use egui::Color32;
+use egui::{Color32, Popup, UiKind};
 use red4lib::{fnv1a64_hash_path, get_red4_hashes};
 
 use crate::{ArchiveViewModel, ETooltipVisuals, TemplateApp};
@@ -48,7 +48,7 @@ impl eframe::App for TemplateApp {
 
         // Left panel
         egui::SidePanel::left("left_panel").show(ctx, |ui| {
-            self.load_order_view(ui);
+            self.load_order_view(ui, ctx);
         });
 
         // main conflicts view
@@ -62,20 +62,51 @@ impl eframe::App for TemplateApp {
 
 impl TemplateApp {
     /// Side panel with a mod list in correct order
-    fn load_order_view(&mut self, ui: &mut egui::Ui) {
+    fn load_order_view(&mut self,  ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading("Load Order");
         ui.label("Drag to reorder, higher overrides");
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.enable_modlist, "Enable load order re-ordering");
+            if ui.checkbox(&mut self.enable_modlist, "Enable load order re-ordering").clicked() {
+                // if toggled on, display a warning that the user understands the risk
+                if self.enable_modlist {
+                    match rfd::MessageDialog::new()
+                        .set_title("Enable load order management")
+                        .set_description("Enabling load order management will create or overwrite a file named \"modlist.txt\" in your /archive/pc/mod folder.\n\n\
+                        This file will determine the load order of your mods and can seriously mess up your game if not used correctly.\n\n\
+                        Are you sure you understand and want to enable this feature?")
+                        .set_buttons(rfd::MessageButtons::OkCancel)
+                        .set_level(rfd::MessageLevel::Warning)
+                        .show() {
+                            rfd::MessageDialogResult::Yes => {},
+                            rfd::MessageDialogResult::Ok => {},
+                            rfd::MessageDialogResult::No => {
+                                self.enable_modlist = false;
+                                self.reset_loadorder();
+                                return;
+                            },
+                            rfd::MessageDialogResult::Cancel => {   
+                                self.enable_modlist = false;
+                                self.reset_loadorder();
+                                return;
+                            },
+                            rfd::MessageDialogResult::Custom(_) => {},
+                        }
+                }
+                else {
+                    self.reset_loadorder();
+                }
+               
+               
+            };
+            
+            
             let response = ui.button("？");
             let popup_id = ui.make_persistent_id("my_unique_id");
             if response.clicked() {
-                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                Popup::toggle_id(ctx, popup_id);
             }
             // open info
-            let below = egui::AboveOrBelow::Below;
-            let close_on_click_outside = egui::popup::PopupCloseBehavior::CloseOnClickOutside;
-            egui::popup::popup_above_or_below_widget(ui, popup_id, &response, below, close_on_click_outside, |ui| {
+            response.on_hover_ui_at_pointer(|ui| {
                 ui.set_min_width(400.0); // if you want to control the size
                 ui.heading("Cyberpunk 2077 load order");
                 ui.label("Archives in Cyberpunk are loaded binary-alphabetically.");
@@ -90,6 +121,11 @@ impl TemplateApp {
                 ui.label("Reordering mods in this app will generate this file.");
             });
         });
+
+        // reset load order button
+        if self.enable_modlist &&  ui.button("⟳  Reset load order").clicked() {
+            self.reset_loadorder();
+        }
 
         ui.separator();
 
@@ -118,6 +154,22 @@ impl TemplateApp {
         });
     }
 
+    fn reset_loadorder(&mut self) {
+        // delete modlist.txt and reload
+        let modlist_path = self.get_modlist_path();
+        if modlist_path.exists() {
+            if let Err(e) = std::fs::remove_file(&modlist_path) {
+                log::error!("Failed to delete modlist.txt: {}", e);
+            }
+        }
+        self.reload_load_order();
+        self.generate_conflict_map();
+        self.last_load_order = Some(self.load_order.clone());
+        if self.enable_modlist {
+            self.serialize_load_order();
+        }
+    }
+    
     /// Main conflict grid
     fn conflicts_view(&mut self, ui: &mut egui::Ui) {
         ui.heading("Conflicts");
@@ -411,11 +463,11 @@ impl TemplateApp {
     /// The menu bar
     fn menu_bar_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         // The top panel is often a good place for a menu bar:
-        egui::menu::bar(ui, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Open modlist.txt").clicked() {
-                    let _ = open::that(self.game_path.join("modlist.txt"));
-                    ui.close_menu();
+                    let _ = open::that(self.get_modlist_path());
+                    ui.close_kind(UiKind::Menu);
                 }
                 ui.separator();
                 if ui.button("Quit").clicked() {
@@ -428,7 +480,7 @@ impl TemplateApp {
                 if ui.button("Open log").clicked() {
                     let _ = open::that(format!("{}.log", crate::CARGO_PKG_NAME));
 
-                    ui.close_menu();
+                    ui.close_kind(UiKind::Menu);
                 }
             });
             ui.add_space(16.0);

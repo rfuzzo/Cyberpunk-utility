@@ -184,21 +184,28 @@ impl TemplateApp {
         self.conflicts = conflicts;
     }
 
+    /// get modilist.txt path
+    pub fn get_modlist_path(&self) -> PathBuf {
+        self.game_path.join("modlist.txt")
+    }
+
     /// Clear and regenerate load order
     pub fn reload_load_order(&mut self) {
         self.load_order.clear();
 
         let mut mods: Vec<PathBuf> = get_files(&self.game_path, "archive");
+
         // load order
         mods.sort_by(|a, b| {
             a.to_string_lossy()
                 .as_bytes()
                 .cmp(b.to_string_lossy().as_bytes())
         });
+
         // load according to modlist.txt
         let mut final_order: Vec<PathBuf> = vec![];
-        let modlist_name = "modlist.txt";
-        if let Ok(lines) = read_file_to_vec(&self.game_path.join(modlist_name)) {
+
+        if let Ok(lines) = read_file_to_vec(&self.get_modlist_path()) {
             for name in lines {
                 let file_name = self.game_path.join(name);
                 if mods.contains(&file_name) {
@@ -224,8 +231,7 @@ impl TemplateApp {
             return;
         }
 
-        let modlist_name = "modlist.txt";
-        if let Ok(mut file) = std::fs::File::create(self.game_path.join(modlist_name)) {
+        if let Ok(mut file) = std::fs::File::create(self.get_modlist_path()) {
             for line in &self.load_order {
                 let new_line = format!("{}\r\n", line);
                 match file.write_all(new_line.as_bytes()) {
