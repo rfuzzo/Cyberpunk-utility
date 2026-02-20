@@ -151,8 +151,13 @@ impl TemplateApp {
                         // update vms
                         // add this file to all previous archive's losing files
                         for archive in archive_names.iter() {
-                            if !self.archives.get(archive).unwrap().loses.contains(hash) {
-                                self.archives.get_mut(archive).unwrap().loses.push(*hash);
+                            let archive_vm = self.archives.get_mut(archive).unwrap();
+                            if !archive_vm.loses.contains(hash) {
+                                archive_vm.loses.push(*hash);
+                            }
+                            // remove from wins if previously marked as winning
+                            if let Some(pos) = archive_vm.wins.iter().position(|w| w == hash) {
+                                archive_vm.wins.remove(pos);
                             }
                         }
                         // add the current archive to the list of conflicting archives last
