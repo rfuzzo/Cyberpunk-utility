@@ -1,24 +1,45 @@
 [package]
 name = "red4-conflicts"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 
-[dependencies]
-egui = "0.32"
-eframe = { version = "0.32", default-features = false, features = [
-  "default_fonts", # Embed the default egui fonts.
-  "glow",          # Use the glow rendering backend. Alternative: "wgpu".
-  "persistence",   # Enable restoring app state when restarting the app.
-] }
-log = "0.4"
-rfd = "0.15"
-serde = { version = "1", features = ["derive"] }
-simple-logging = "2.0"
-open = "5.3"
-egui_dnd = "0.13"
+[features]
+default = ["gui"]
+gui = ["dep:egui", "dep:eframe", "dep:egui_dnd", "dep:rfd", "dep:open", "dep:simple-logging"]
+cli = ["dep:clap", "dep:serde_json", "dep:simple_logger", "dep:regex", "dep:toon-format"]
 
-[patch.crates-io]
+[dependencies]
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+
+# GUI-only dependencies
+egui = { version = "0.32", optional = true }
+eframe = { version = "0.32", default-features = false, features = [
+  "default_fonts",
+  "glow",
+  "persistence",
+], optional = true }
+egui_dnd = { version = "0.13", optional = true }
+rfd = { version = "0.15", optional = true }
+open = { version = "5.3", optional = true }
+simple-logging = { version = "2.0", optional = true }
+
+# CLI-only dependencies
+clap = { version = "4.5", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+simple_logger = { version = "5", optional = true }
+regex = { version = "1", optional = true }
+toon-format = { version = "0.2", optional = true }
 
 [dependencies.red4lib]
 git = "https://github.com/rfuzzo/red4lib"
-#path = "D:\\GitHub\\__rfuzzo\\red4lib"
+
+[[bin]]
+name = "red4-conflicts"
+path = "src/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "red4-conflicts-cli"
+path = "src/cli.rs"
+required-features = ["cli"]
