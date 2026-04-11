@@ -8,11 +8,40 @@ Some utility tools for Cyberpunk 2077 modding.
 
 > Nexus Mods link: https://www.nexusmods.com/cyberpunk2077/mods/11126
 
-A conflict-checker app for Cyberpunk 2077 archives.
+A conflict-checker app for Cyberpunk 2077 archives. Available as both a GUI app and a headless CLI tool.
 
-### Usage
+### Using the GUI
 - download and extract
 - run `red4-conflicts.exe` and specify a folder with archives to check
+
+### Using the CLI
+
+The CLI outputs structured JSON for use with LLMs or other tools. It auto-detects your game installation (Steam/GOG).
+
+```cmd
+Usage: red4-conflicts-cli.exe [OPTIONS] [ARCHIVE_PATH]
+
+Options:
+      --pretty                  Pretty-print the JSON output
+      --toon                    Output in TOON format (experimental, fewer tokens for LLM input)
+      --summary                 Compact overview instead of full report
+      --mod-filter <PATTERN>    Filter archives by name (supports regex)
+      --file-filter <PATTERN>   Filter files by path (supports regex)
+      --show-no-conflicts       Include non-conflicting files
+      --show-load-order         Include the full load order list
+  -h, --help                    Print help
+```
+
+```cmd
+# Get a summary of all conflicts
+red4-conflicts-cli --summary --pretty
+
+# Filter for a specific mod
+red4-conflicts-cli --mod-filter "ArchiveXL" --pretty
+
+# Save full report to file
+red4-conflicts-cli --pretty > conflicts.json
+```
 
 ### Screenshots
 ![screenshot](./assets/red4_conflicts_02.png)

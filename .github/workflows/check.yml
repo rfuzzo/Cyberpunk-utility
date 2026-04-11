@@ -28,6 +28,11 @@ jobs:
         run: |
           cd ${{ matrix.target }}
           cargo build --${{ matrix.build_type }}
+      - name: Build CLI
+        if: matrix.target == 'red4-conflicts'
+        run: |
+          cd red4-conflicts
+          cargo build --${{ matrix.build_type }} --features cli --no-default-features
       - name: Run tests
         run: |
           cd ${{ matrix.target }}
