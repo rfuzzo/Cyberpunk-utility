@@ -77,6 +77,9 @@ pub struct TemplateApp {
     text_filter: String,
     #[serde(skip)]
     file_filter: String,
+    /// highlights matching mods in the load order (visual only)
+    #[serde(skip)]
+    highlight_filter: String,
 }
 
 impl TemplateApp {

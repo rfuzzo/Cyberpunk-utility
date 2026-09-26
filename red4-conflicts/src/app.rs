@@ -127,7 +127,26 @@ impl TemplateApp {
             self.reset_loadorder();
         }
 
+        // highlight filter: only changes how names look, never what is listed
+        ui.horizontal(|ui| {
+            ui.label("Highlight: ");
+            ui.text_edit_singleline(&mut self.highlight_filter);
+            if ui.button("x").clicked() {
+                self.highlight_filter.clear();
+            }
+        });
+
         ui.separator();
+
+        let needle = self.highlight_filter.to_lowercase();
+        let mod_label = |f: &str| {
+            let text = egui::RichText::new(f);
+            if !needle.is_empty() && f.to_lowercase().contains(&needle) {
+                text.background_color(Color32::YELLOW).color(Color32::BLACK)
+            } else {
+                text
+            }
+        };
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             if self.enable_modlist {
@@ -138,7 +157,7 @@ impl TemplateApp {
                             handle.ui(ui, |ui| {
                                 ui.label("::");
                             });
-                            ui.label(f.clone());
+                            ui.label(mod_label(f));
                         });
                     },
                 );
@@ -146,7 +165,7 @@ impl TemplateApp {
                 egui::Grid::new("mod_list").show(ui, |ui| {
                     let mods = &self.load_order;
                     for f in mods.iter() {
-                        ui.label(f);
+                        ui.label(mod_label(f));
                         ui.end_row();
                     }
                 });
